@@ -1,8 +1,27 @@
 {
   "version": 2,
-  "rewrites": [
-    { "source": "/api/scrape", "destination": "/api/scrape.js" },
-    { "source": "/brochure", "destination": "/public/brochure.html" },
-    { "source": "/", "destination": "/public/brochure.html" }
+  "builds": [
+    {
+      "src": "public/brochure.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "api/scrape.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/scrape",
+      "dest": "/api/scrape.js"
+    },
+    {
+      "src": "/brochure",
+      "dest": "/public/brochure.html"
+    },
+    {
+      "src": "/",
+      "dest": "/public/brochure.html"
+    }
   ]
 }
