@@ -1,7 +1,8 @@
 const https = require('https');
 const http = require('http');
 
-function fetchUrl(url) {
+function fetchUrl(url, redirectCount = 0) {
+  if (redirectCount > 5) return Promise.reject(new Error('Too many redirects'));
   return new Promise((resolve, reject) => {
     const client = url.startsWith('https') ? https : http;
     const req = client.get(url, {
@@ -14,7 +15,7 @@ function fetchUrl(url) {
       }
     }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return fetchUrl(res.headers.location).then(resolve).catch(reject);
+        return fetchUrl(res.headers.location, redirectCount + 1).then(resolve).catch(reject);
       }
       let data = '';
       res.on('data', chunk => data += chunk);
@@ -25,27 +26,22 @@ function fetchUrl(url) {
   });
 }
 
-// ── Vercel handler format ──
 module.exports = async (req, res) => {
   const url = req.query && req.query.url;
-
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Content-Type', 'application/json');
-
-  if (!url) {
-    return res.status(400).json({ error: 'No URL provided' });
-  }
+  if (!url) return res.status(400).json({ error: 'No URL provided' });
 
   try {
     const html = await fetchUrl(url);
 
-    // ── JSON-LD structured data ──
+    // ── JSON-LD ──
     let jsonLD = null;
     const jsonLDMatches = [...html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)];
     for (const match of jsonLDMatches) {
       try {
         const parsed = JSON.parse(match[1]);
-        if (parsed.name || parsed.price || parsed['@type']) { jsonLD = parsed; break; }
+        if (parsed.name || parsed['@type']) { jsonLD = parsed; break; }
       } catch(e) {}
     }
 
@@ -60,25 +56,34 @@ module.exports = async (req, res) => {
       return '';
     };
 
-    // ── Clean text ──
-    const cleanHtml = html
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[\s\S]*?<\/style>/gi, '');
+    const cleanHtml = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
     const text = cleanHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
-    // ── Building ──
+    // ── Building — strip ALL marketing text ──
     let building = (jsonLD && jsonLD.name) || metaContent('og:title') || '';
-    building = building.replace(/\s*[-|].*?(PropertyFinder|Bayut|betterhomes).*/i, '').trim();
-    building = building.replace(/^[\d\w\s]+\|\s*/i, '').trim();
+    building = building.replace(/\s*[\|\-]\s*(?:Property\s*Finder|PropertyFinder|Bayut|betterhomes)[^]*/i, '').trim();
+    building = building.replace(/^(?:Sale|Rent|Buy)\s+in\s+/i, '').trim();
+    // Keep only the part before first pipe or colon
+    building = building.split('|')[0].split(':')[0].trim();
 
     // ── Area ──
     let area = '';
-    if (jsonLD && jsonLD.address) area = jsonLD.address.addressLocality || '';
+    if (jsonLD && jsonLD.address) area = jsonLD.address.addressLocality || jsonLD.address.addressRegion || '';
     if (!area) {
-      const m = (metaContent('og:title') || '').match(/in\s+([^,|]+(?:,\s*[^,|]+)?)\s*[-|]/i);
+      const ogTitle = metaContent('og:title') || '';
+      const m = ogTitle.match(/in\s+([\w\s]+(?:,\s*[\w\s]+)?)\s*[\|:]/i);
       if (m) area = m[1].trim();
     }
     if (!area) area = 'Dubai';
+
+    // ── REF from URL ──
+    let ref = '';
+    const urlRefM = url.match(/-(\d{6,})\.html/);
+    if (urlRefM) ref = urlRefM[1];
+    if (!ref) {
+      const refM = text.match(/(?:Reference|Ref(?:erence)?\s*(?:No\.?|Number|#|:))\s*([A-Z0-9\-]{4,20})/i);
+      if (refM) ref = refM[1];
+    }
 
     // ── Beds / Baths / Size ──
     let beds = '', baths = '', size = '';
@@ -87,25 +92,48 @@ module.exports = async (req, res) => {
       baths = String(jsonLD.numberOfBathroomsTotal || jsonLD.numberOfBathrooms || '');
       if (jsonLD.floorSize) size = String(jsonLD.floorSize.value || '');
     }
-    if (!beds)  { const m = text.match(/(\d+)\s*Bed(?:room)?s?/i);  if (m) beds  = m[1]; }
-    if (!baths) { const m = text.match(/(\d+)\s*Bath(?:room)?s?/i); if (m) baths = m[1]; }
+    if (!beds)  { const m = text.match(/(\d+)\s*Bed(?:room)?s?\b/i);  if (m) beds  = m[1]; }
+    if (!baths) { const m = text.match(/(\d+)\s*Bath(?:room)?s?\b/i); if (m) baths = m[1]; }
     if (!size)  { const m = text.match(/([\d,]+)\s*sq\.?\s*(?:ft|feet)/i); if (m) size = m[1].replace(/,/g,''); }
 
-    // ── Price ──
+    // ── Price — validate 100k to 500M AED ──
     let price = '', tenure = '';
+
+    // Try JSON-LD first
     if (jsonLD && jsonLD.offers && jsonLD.offers.price) {
-      price = 'AED ' + Number(jsonLD.offers.price).toLocaleString();
+      const raw = Number(String(jsonLD.offers.price).replace(/,/g,''));
+      if (raw >= 100000 && raw <= 500000000) price = 'AED ' + raw.toLocaleString();
     }
+
+    // Scan page text for all AED prices, pick most reasonable
     if (!price) {
-      const m = text.match(/AED\s*([\d,]+)/i);
-      if (m) { const raw = m[1].replace(/,/g,''); if (raw.length >= 5) price = 'AED ' + Number(raw).toLocaleString(); }
+      const allPrices = [...text.matchAll(/AED\s*([\d,]+)/gi)];
+      for (const m of allPrices) {
+        const raw = Number(m[1].replace(/,/g,''));
+        if (raw >= 100000 && raw <= 500000000) {
+          price = 'AED ' + raw.toLocaleString();
+          break;
+        }
+      }
     }
+
+    // PropertyFinder sometimes shows price as plain number near "AED/sqft" — find standalone large number
+    if (!price) {
+      const m = text.match(/(\d{1,3}(?:,\d{3})+)(?:\s*AED|\s*$)/);
+      if (m) {
+        const raw = Number(m[1].replace(/,/g,''));
+        if (raw >= 100000 && raw <= 500000000) price = 'AED ' + raw.toLocaleString();
+      }
+    }
+
     if (text.toLowerCase().includes('freehold')) tenure = 'Freehold';
     else if (text.toLowerCase().includes('leasehold')) tenure = 'Leasehold';
 
     // ── Description ──
-    let description = (jsonLD && jsonLD.description) || metaContent('og:description') || metaContent('description') || '';
-    description = description.replace(/\.\.\.$/, '').trim();
+    let description = '';
+    if (jsonLD && jsonLD.description) description = jsonLD.description;
+    else description = metaContent('og:description') || metaContent('description') || '';
+    description = description.replace(/\.\.\.\s*(?:Book a Viewing Today!?)?$/i, '').trim();
 
     // ── Features ──
     const features = [];
@@ -114,26 +142,69 @@ module.exports = async (req, res) => {
     if (size)   features.push(size + ' sq ft');
     if (tenure) features.push(tenure);
 
-    // ── Photos ──
+    // ── Photos — extract ALL unique PF CDN images ──
+    // From inspect: src="https://static.shared.propertyfinder.ae/media/images/listing/S2D2PS2EYTWT...
     const photos = [];
+    const seen = new Set();
+
+    // Method 1: og:image
     const ogImage = metaContent('og:image');
-    if (ogImage) photos.push(ogImage);
+    if (ogImage && ogImage.startsWith('http') && !ogImage.includes('floorplan')) {
+      photos.push(ogImage);
+      seen.add(ogImage);
+    }
+
+    // Method 2: All PF CDN listing images (NOT floorplan)
+    const pfImgPattern = /https:\/\/static\.shared\.propertyfinder\.ae\/media\/images\/listing\/[A-Za-z0-9]+\/[^"'\s\\]+(?:668x452|large|medium)[^"'\s\\]*\.jpg/g;
+    const pfMatches = [...html.matchAll(pfImgPattern)];
+    for (const m of pfMatches) {
+      const src = m[0];
+      if (!seen.has(src) && !src.includes('floorplan') && photos.length < 5) {
+        photos.push(src);
+        seen.add(src);
+      }
+    }
+
+    // Method 3: Any PF CDN image fallback
+    if (photos.length < 2) {
+      const anyPfPattern = /https:\/\/static\.shared\.propertyfinder\.ae\/media\/images\/listing\/[^"'\s\\]+\.jpg/g;
+      const anyMatches = [...html.matchAll(anyPfPattern)];
+      for (const m of anyMatches) {
+        const src = m[0];
+        if (!seen.has(src) && !src.includes('floorplan') && !src.includes('watermark') && photos.length < 5) {
+          photos.push(src);
+          seen.add(src);
+        }
+      }
+    }
+
+    // Method 4: JSON-LD images
     if (jsonLD && jsonLD.image) {
       const imgs = Array.isArray(jsonLD.image) ? jsonLD.image : [jsonLD.image];
       imgs.forEach(img => {
         const src = typeof img === 'string' ? img : (img.url || img.contentUrl || '');
-        if (src && !photos.includes(src) && photos.length < 4) photos.push(src);
+        if (src && src.startsWith('http') && !src.includes('floorplan') && !seen.has(src) && photos.length < 5) {
+          photos.push(src);
+          seen.add(src);
+        }
       });
     }
-    const cdnMatches = [...html.matchAll(/https:\/\/static\.shared\.propertyfinder\.ae\/media\/images\/listing\/[^"'\s]+\.jpg/g)];
-    cdnMatches.forEach(m => { if (!photos.includes(m[0]) && photos.length < 4) photos.push(m[0]); });
 
-    // ── REF ──
-    let ref = '';
-    const refM = html.match(/(?:ref|reference)[^>]*?[:\s#]+([A-Z0-9]{6,})/i);
-    if (refM) ref = refM[1];
+    // ── Floor plan — PF stores as /floorplan/ in path ──
+    let floorplan = '';
+    // From inspect: src="https://static.shared.propertyfinder.ae/media/images/floorplan/..."
+    const fpPattern = /https:\/\/static\.shared\.propertyfinder\.ae\/media\/images\/f[^"'\s\\]+(?:\.jpg|\.png|\.webp)/gi;
+    const fpMatches = [...html.matchAll(fpPattern)];
+    if (fpMatches.length > 0) floorplan = fpMatches[0][0];
 
-    return res.status(200).json({ building, area, ref, beds, baths, size, price, tenure, description, features, photos, floorplan: '' });
+    // Also check watermarked floor plans
+    if (!floorplan) {
+      const fpWater = /https:\/\/[^"'\s]+floorplan[^"'\s]+(?:\.jpg|\.png|\.webp)/gi;
+      const fpWaterMatches = [...html.matchAll(fpWater)];
+      if (fpWaterMatches.length > 0) floorplan = fpWaterMatches[0][0];
+    }
+
+    return res.status(200).json({ building, area, ref, beds, baths, size, price, tenure, description, features, photos, floorplan });
 
   } catch (err) {
     return res.status(500).json({ error: err.message });
