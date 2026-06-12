@@ -163,21 +163,63 @@
   .p2-agent-item svg{flex-shrink:0;opacity:.8;}
   .p2-agent-logo img{height:14px;filter:brightness(0) invert(1);opacity:.85;}
   @media print{
+    @page{
+      size: A4 portrait;
+      margin: 0;
+    }
+    html, body{
+      width: 210mm;
+      height: 297mm;
+      margin: 0;
+      padding: 0;
+      background:#fff;
+      -webkit-print-color-adjust:exact;
+      print-color-adjust:exact;
+    }
     #toolbar,#loading,#error-msg{display:none!important;}
-    body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    #brochure{margin:0;width:100%;}
-    .page{box-shadow:none;margin-bottom:0;}
-    /* Force all green backgrounds to print */
+    #brochure{
+      margin:0;
+      width:210mm;
+    }
+    .page{
+      box-shadow:none;
+      margin:0;
+      padding:0;
+      width:210mm;
+      min-height:297mm;
+      height:297mm;
+      overflow:hidden;
+      page-break-after:always;
+      page-break-inside:avoid;
+      display:flex;
+      flex-direction:column;
+    }
+    /* Stretch page 1 photo to fill available space */
+    .p1-photo{
+      flex:1;
+      height:auto !important;
+    }
+    /* Stretch page 2 body to fill */
+    .p2-body{
+      flex:1;
+      min-height:0 !important;
+    }
+    .p2-left{
+      flex-shrink:0;
+    }
+    /* Force all backgrounds to print */
     .p-header,.pfoot,.p2-agent-bar{
       -webkit-print-color-adjust:exact;
       print-color-adjust:exact;
       background:#1a4a3a !important;
+      flex-shrink:0;
     }
     .p2-fp-top{
       -webkit-print-color-adjust:exact;
       print-color-adjust:exact;
       background:#e8e3da !important;
     }
+    .p1-bottom{flex-shrink:0;}
   }
 </style>
 </head>
