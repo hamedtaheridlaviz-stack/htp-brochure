@@ -164,34 +164,29 @@
   .p2-agent-logo img{height:14px;filter:brightness(0) invert(1);opacity:.85;}
   @media print{
     @page {
-      size: A5 landscape;
+      size: 210mm 148mm;
       margin: 0;
     }
     html, body {
+      width: 210mm;
       margin: 0;
       padding: 0;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
     #toolbar,#loading,#error-msg { display: none !important; }
-    #brochure {
-      margin: 0;
-      width: 210mm;
-    }
+    #brochure { margin: 0; width: 210mm; }
     .page {
       box-shadow: none;
+      width: 210mm !important;
+      height: 148mm !important;
       margin: 0 !important;
-      width: 210mm;
-      height: 148mm;
       overflow: hidden;
       page-break-after: always;
       page-break-inside: avoid;
-      /* Scale 794px down to 210mm = 793.7px, so scale ≈ 1.0 */
-      /* But height needs to fit in 148mm ≈ 559px — scale to fit height */
-      transform-origin: top left;
-      transform: scale(0.706);
-      margin-bottom: -163px !important;
     }
+    /* Scale page content to fit — 794px screen = 210mm print */
+    .page > * { zoom: 0.706; }
     .p-header, .pfoot, .p2-agent-bar {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
@@ -215,7 +210,7 @@
     <div class="t-title">HAMED TAHERI PROPERTIES</div>
     <div class="t-sub">Print → Save as PDF to share with client</div>
   </div>
-  <button id="save-btn" onclick="savePDF()">SAVE AS PDF</button>
+  <button id="save-btn" onclick="window.print()">SAVE AS PDF</button>
 </div>
 
 <div id="brochure">
@@ -428,20 +423,7 @@
   }
 })();
 
-function savePDF() {
-  const params = new URLSearchParams(window.location.search);
-  const url = params.get('url');
-  if (!url) { window.print(); return; }
-  // Show loading state
-  const btn = document.getElementById('save-btn');
-  const orig = btn.textContent;
-  btn.textContent = 'GENERATING...';
-  btn.disabled = true;
-  // Call PDF API
-  window.location.href = '/api/pdf?url=' + encodeURIComponent(url);
-  // Reset button after delay
-  setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 4000);
-}
+
 </script>
 </body>
 </html>
