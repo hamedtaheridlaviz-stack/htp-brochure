@@ -63,8 +63,17 @@ module.exports = async (req, res) => {
     let building = (jsonLD && jsonLD.name) || metaContent('og:title') || '';
     building = building.replace(/\s*[\|\-]\s*(?:Property\s*Finder|PropertyFinder|Bayut|betterhomes)[^]*/i, '').trim();
     building = building.replace(/^(?:Sale|Rent|Buy)\s+in\s+/i, '').trim();
-    // Keep only the part before first pipe or colon
     building = building.split('|')[0].split(':')[0].trim();
+
+    // ── Marketing title (e.g. "New To Market | C Type | Fully Renovated Unit") ──
+    // From h1 with class containing "title" on PropertyFinder
+    let marketingTitle = '';
+    const h1Match = html.match(/class="[^"]*title[^"]*"[^>]*>([^<]{10,120})<\/h1>/i);
+    if (h1Match) {
+      marketingTitle = h1Match[1].trim();
+      // Remove "Property Finder" if it crept in
+      marketingTitle = marketingTitle.replace(/\s*[\|\-]\s*Property\s*Finder.*/i, '').trim();
+    }
 
     // ── Area ──
     let area = '';
@@ -99,32 +108,52 @@ module.exports = async (req, res) => {
     // ── Price — validate 100k to 500M AED ──
     let price = '', tenure = '';
 
-    // Try JSON-LD first
-    if (jsonLD && jsonLD.offers && jsonLD.offers.price) {
-      const raw = Number(String(jsonLD.offers.price).replace(/,/g,''));
+    // ── Price — target PropertyFinder's exact price element ──
+    let price = '', tenure = '';
+
+    // Method 1: data-testid="property-price-value" — most reliable
+    const priceTestId = html.match(/data-testid="property-price-value"[^>]*>([\d,]+)</);
+    if (priceTestId) {
+      const raw = Number(priceTestId[1].replace(/,/g,''));
       if (raw >= 100000 && raw <= 500000000) price = 'AED ' + raw.toLocaleString();
     }
 
-    // Scan page text for all AED prices, pick most reasonable
+    // Method 2: class containing "price--value" or "price__value"
     if (!price) {
-      const allPrices = [...text.matchAll(/AED\s*([\d,]+)/gi)];
-      for (const m of allPrices) {
-        const raw = Number(m[1].replace(/,/g,''));
-        if (raw >= 100000 && raw <= 500000000) {
-          price = 'AED ' + raw.toLocaleString();
-          break;
-        }
-      }
-    }
-
-    // PropertyFinder sometimes shows price as plain number near "AED/sqft" — find standalone large number
-    if (!price) {
-      const m = text.match(/(\d{1,3}(?:,\d{3})+)(?:\s*AED|\s*$)/);
-      if (m) {
-        const raw = Number(m[1].replace(/,/g,''));
+      const priceClass = html.match(/class="[^"]*price[^"]*value[^"]*"[^>]*>([\d,]+)</i);
+      if (priceClass) {
+        const raw = Number(priceClass[1].replace(/,/g,''));
         if (raw >= 100000 && raw <= 500000000) price = 'AED ' + raw.toLocaleString();
       }
     }
+
+    // Method 3: og:description usually has "AED X,XXX,XXX"
+    if (!price) {
+      const ogDesc = metaContent('og:description') || '';
+      const ogPriceM = ogDesc.match(/AED\s*([\d,]+)/i);
+      if (ogPriceM) {
+        const raw = Number(ogPriceM[1].replace(/,/g,''));
+        if (raw >= 100000 && raw <= 500000000) price = 'AED ' + raw.toLocaleString();
+      }
+    }
+
+    // Method 4: scan all AED values, pick most frequent in valid range
+    if (!price) {
+      const allCandidates = [];
+      const allPriceMatches = [...text.matchAll(/AED\s*([\d,]+)/gi)];
+      for (const m of allPriceMatches) {
+        const raw = Number(m[1].replace(/,/g,''));
+        if (raw >= 100000 && raw <= 500000000) allCandidates.push(raw);
+      }
+      if (allCandidates.length > 0) {
+        const freq = {};
+        allCandidates.forEach(v => freq[v] = (freq[v] || 0) + 1);
+        const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1] || a[0]-b[0]);
+        price = 'AED ' + Number(sorted[0][0]).toLocaleString();
+      }
+    }
+
+    // Collect ALL numbers from page, find most frequent reasonable price
 
     if (text.toLowerCase().includes('freehold')) tenure = 'Freehold';
     else if (text.toLowerCase().includes('leasehold')) tenure = 'Leasehold';
@@ -204,7 +233,7 @@ module.exports = async (req, res) => {
       if (fpWaterMatches.length > 0) floorplan = fpWaterMatches[0][0];
     }
 
-    return res.status(200).json({ building, area, ref, beds, baths, size, price, tenure, description, features, photos, floorplan });
+    return res.status(200).json({ building, area, ref, beds, baths, size, price, tenure, description, features, photos, floorplan, marketingTitle });
 
   } catch (err) {
     return res.status(500).json({ error: err.message });
