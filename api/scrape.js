@@ -198,31 +198,30 @@ module.exports = async (req, res) => {
     if (size)   features.push(size + ' sq ft');
     if (tenure) features.push(tenure);
 
-    // ── Photos — extract unique images by base filename ──
+    // ── Photos — extract unique images by UUID segment ──
+    // PF URL structure: /listing/PROPERTY_HASH/IMAGE_UUID/668x452.jpg
+    // Each unique image has a different IMAGE_UUID — dedupe on that
     const photos = [];
-    const seenUrls = new Set();
-    const seenFiles = new Set(); // dedupe by filename to avoid same image at different sizes
+    const seenUUIDs = new Set();
 
     const addPhoto = (src) => {
       if (!src || !src.startsWith('http')) return;
       if (src.includes('floorplan') || src.includes('floor-plan')) return;
-      if (seenUrls.has(src)) return;
-      // Extract base filename to detect duplicates at different resolutions
-      const fileMatch = src.match(/\/([A-Za-z0-9_-]+)\.(jpg|png|webp)/i);
-      const fileKey = fileMatch ? fileMatch[1] : src;
-      if (seenFiles.has(fileKey)) return;
       if (photos.length >= 5) return;
+      // Extract the UUID segment (second hash in path)
+      const uuidMatch = src.match(/listing\/[A-Za-z0-9]+\/([A-Za-z0-9\-]+)\//);
+      const key = uuidMatch ? uuidMatch[1] : src;
+      if (seenUUIDs.has(key)) return;
+      seenUUIDs.add(key);
       photos.push(src);
-      seenUrls.add(src);
-      seenFiles.add(fileKey);
     };
 
-    // PF CDN listing images — these are the actual property photos
-    // Pattern from inspect: /media/images/listing/HASH/HASH/668x452.jpg
-    const pfImgs = Array.from(html.matchAll(/https:\/\/static\.shared\.propertyfinder\.ae\/media\/images\/listing\/[^"'\s\\]+\.jpg/g));
-    pfImgs.forEach(m => addPhoto(m[0]));
+    // Primary: all PF CDN listing images from raw HTML
+    // Pattern: https://static.shared.propertyfinder.ae/media/images/listing/HASH/UUID/668x452.jpg
+    const pfPattern = new RegExp("https://static\\.shared\\.propertyfinder\\.ae/media/images/listing/[A-Za-z0-9]+/[A-Za-z0-9-]+/[^\\s\"']+\\.jpg", "g");
+    Array.from(html.matchAll(pfPattern)).forEach(m => addPhoto(m[0]));
 
-    // JSON-LD images
+    // JSON-LD images as supplement
     if (jsonLD && jsonLD.image) {
       const imgs = Array.isArray(jsonLD.image) ? jsonLD.image : [jsonLD.image];
       imgs.forEach(img => {
@@ -231,8 +230,11 @@ module.exports = async (req, res) => {
       });
     }
 
-    // og:image as last fallback
-    if (photos.length === 0) addPhoto(metaContent('og:image'));
+    // og:image fallback only if nothing found
+    if (photos.length === 0) {
+      const og = metaContent('og:image');
+      if (og && !og.includes('floorplan')) photos.push(og);
+    }
 
     // ── Floor plan ──
     let floorplan = '';
