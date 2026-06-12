@@ -170,37 +170,37 @@
     html, body {
       margin: 0;
       padding: 0;
-      width: 210mm;
       background: #fff;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
     #toolbar,#loading,#error-msg { display: none !important; }
 
-    /* Put both pages side by side on one A4 sheet */
+    /* Stack both pages vertically on one A4 sheet */
+    /* A4 portrait = 210 x 297mm */
+    /* Each brochure page = 794px wide, scaled to 210mm wide = scale 0.664 */
+    /* Scaled height = original height * 0.664, each gets 148.5mm (half of 297mm) */
     #brochure {
       margin: 0;
       width: 210mm;
       height: 297mm;
       display: flex;
-      flex-direction: row;
-      flex-wrap: nowrap;
+      flex-direction: column;
+      overflow: hidden;
       page-break-inside: avoid;
     }
     .page {
       box-shadow: none;
       margin: 0;
       padding: 0;
-      flex: 0 0 105mm;
-      width: 105mm;
-      height: 297mm;
+      flex: 0 0 148.5mm;
+      width: 794px;
       overflow: hidden;
       page-break-after: avoid;
       page-break-inside: avoid;
-      /* Scale each 794px wide page down to 105mm (~397px) */
       transform-origin: top left;
-      transform: scale(0.499);
-      margin-right: -52.5mm;
+      transform: scale(0.664);
+      margin-bottom: -196px;
     }
     /* Force all backgrounds */
     .p-header, .pfoot, .p2-agent-bar {
