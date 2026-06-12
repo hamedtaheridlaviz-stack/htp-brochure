@@ -1,259 +1,141 @@
-const chromium = require('@sparticuz/chromium');
-const puppeteer = require('puppeteer-core');
+const https = require('https');
+const http = require('http');
 
-exports.handler = async (event) => {
-  const url = event.queryStringParameters && event.queryStringParameters.url;
+function fetchUrl(url) {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith('https') ? https : http;
+    const req = client.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'identity',
+        'Cache-Control': 'no-cache',
+      }
+    }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return fetchUrl(res.headers.location).then(resolve).catch(reject);
+      }
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => resolve(data));
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('Timeout')); });
+  });
+}
+
+// ── Vercel handler format ──
+module.exports = async (req, res) => {
+  const url = req.query && req.query.url;
+
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Content-Type', 'application/json');
+
   if (!url) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'No URL provided' }) };
+    return res.status(400).json({ error: 'No URL provided' });
   }
 
-  let browser;
   try {
-    browser = await puppeteer.launch({
-      args: [
-        ...chromium.args,
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-web-security',
-      ],
-      defaultViewport: { width: 1280, height: 900 },
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-    });
+    const html = await fetchUrl(url);
 
-    const page = await browser.newPage();
+    // ── JSON-LD structured data ──
+    let jsonLD = null;
+    const jsonLDMatches = [...html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)];
+    for (const match of jsonLDMatches) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        if (parsed.name || parsed.price || parsed['@type']) { jsonLD = parsed; break; }
+      } catch(e) {}
+    }
 
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-    );
-    await page.evaluateOnNewDocument(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => false });
-      window.chrome = { runtime: {} };
-    });
-
-    // Intercept and block images/fonts to speed up load
-    await page.setRequestInterception(true);
-    page.on('request', req => {
-      const rt = req.resourceType();
-      if (['font', 'stylesheet'].includes(rt)) req.abort();
-      else req.continue();
-    });
-
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
-
-    // Wait for content — PropertyFinder renders via React, need to wait
-    await page.waitForFunction(
-      () => document.body.innerText.length > 1000,
-      { timeout: 12000 }
-    ).catch(() => {});
-    await new Promise(r => setTimeout(r, 3000));
-
-    const data = await page.evaluate(() => {
-      // Helpers
-      const q  = s => document.querySelector(s);
-      const qa = s => Array.from(document.querySelectorAll(s));
-      const tx = s => { const e = q(s); return e ? e.innerText.trim() : ''; };
-
-      // ── Building name from h1 ──
-      let building = '';
-      const h1 = q('h1');
-      if (h1) building = h1.innerText.trim().split('\n')[0].trim();
-
-      // ── Area — from page title or breadcrumbs ──
-      let area = '';
-      // PropertyFinder breadcrumb structure
-      const breadLinks = qa('nav a, [class*="breadcrumb"] a, [class*="Breadcrumb"] a');
-      if (breadLinks.length >= 2) {
-        area = breadLinks[breadLinks.length - 1].innerText.trim();
-      }
-      if (!area) {
-        // From <title>: "3 BR | Apartment | Oceana Pacific, Dubai"
-        const title = document.title;
-        const m = title.match(/([^|,]+),\s*Dubai/);
-        if (m) area = m[1].trim() + ', Dubai';
-      }
-      if (!area) area = 'Dubai';
-
-      // ── REF ──
-      let ref = '';
-      const refMatch = document.body.innerText.match(/(?:ref(?:erence)?|id)[:\s#]*([A-Z0-9]{5,})/i);
-      if (refMatch) ref = refMatch[1];
-
-      // ── Stats — PropertyFinder uses spans/divs with text like "3 Beds" "4 Baths" "2,279 sq. ft." ──
-      let beds = '', baths = '', size = '';
-
-      // Try all elements that contain numbers near bed/bath/sq text
-      qa('span, div, li, p').forEach(el => {
-        if (el.children.length > 2) return; // skip containers
-        const t = el.innerText.trim().toLowerCase();
-        if (!t || t.length > 50) return;
-
-        if (!beds && /^\d+\s*bed/i.test(t)) beds = t.match(/(\d+)/)[1];
-        if (!baths && /^\d+\s*bath/i.test(t)) baths = t.match(/(\d+)/)[1];
-        if (!size && /[\d,]+\s*sq/i.test(t)) {
-          const m = t.match(/([\d,]+)\s*sq/i);
-          if (m) size = m[1].replace(/,/g, '');
-        }
-      });
-
-      // Fallback: scan raw page text
-      const rawText = document.body.innerText;
-      if (!beds)  { const m = rawText.match(/(\d)\s*Bed/);  if (m) beds  = m[1]; }
-      if (!baths) { const m = rawText.match(/(\d)\s*Bath/); if (m) baths = m[1]; }
-      if (!size)  { const m = rawText.match(/([\d,]+)\s*sq\.?\s*ft/i); if (m) size = m[1].replace(/,/g,''); }
-
-      // ── Price — full number e.g. 5,800,000 ──
-      let price = '', tenure = '';
-      // PropertyFinder shows price as "AED 5,800,000" in a heading/span
-      const priceEls = qa('[class*="price"], [class*="Price"], h2, h3, strong');
-      for (const el of priceEls) {
-        const t = el.innerText.trim();
-        const m = t.match(/AED\s*([\d,]+)/i);
-        if (m) {
-          const raw = m[1].replace(/,/g, '');
-          if (raw.length >= 5) { // must be at least 5 digits (10,000+)
-            price = 'AED ' + Number(raw).toLocaleString();
-            break;
-          }
-        }
-      }
-      // Raw text fallback
-      if (!price) {
-        const m = rawText.match(/AED\s*([\d,]+)/i);
-        if (m) {
-          const raw = m[1].replace(/,/g, '');
-          if (raw.length >= 5) price = 'AED ' + Number(raw).toLocaleString();
-        }
-      }
-
-      if (rawText.toLowerCase().includes('freehold')) tenure = 'Freehold';
-      else if (rawText.toLowerCase().includes('leasehold')) tenure = 'Leasehold';
-
-      // ── Description — FULL text, not truncated ──
-      let description = '';
-
-      // PropertyFinder description is usually in a section with "Description" heading
-      // Try to find the section after a "Description" heading
-      const headings = qa('h2, h3, h4, [class*="heading"], [class*="section-title"]');
-      for (const h of headings) {
-        if (h.innerText.trim().toLowerCase() === 'description' || h.innerText.trim().toLowerCase() === 'about') {
-          // Get the next sibling paragraphs
-          let next = h.nextElementSibling;
-          let text = '';
-          while (next && text.length < 2000) {
-            text += next.innerText.trim() + '\n\n';
-            next = next.nextElementSibling;
-            if (next && (next.tagName === 'H2' || next.tagName === 'H3')) break;
-          }
-          if (text.length > 100) { description = text.trim(); break; }
-        }
-      }
-
-      // Fallback: largest meaningful paragraph block
-      if (!description || description.length < 100) {
-        let best = '';
-        qa('p, [class*="description"] div, [class*="desc"] div').forEach(el => {
-          const t = el.innerText.trim();
-          if (
-            t.length > best.length &&
-            t.length > 100 &&
-            !t.includes('Cookie') &&
-            !t.includes('©') &&
-            !t.includes('Terms of') &&
-            !t.includes('Privacy')
-          ) best = t;
-        });
-        description = best;
-      }
-
-      // ── Features / amenities ──
-      const features = [];
-      const featSels = [
-        '[class*="amenity"] li',
-        '[class*="feature"] li',
-        '[class*="highlight"] li',
-        '[class*="Amenity"] li',
-        '[class*="Feature"] li',
+    const metaContent = (name) => {
+      const patterns = [
+        new RegExp(`<meta[^>]*name="${name}"[^>]*content="([^"]*)"`, 'i'),
+        new RegExp(`<meta[^>]*content="([^"]*)"[^>]*name="${name}"`, 'i'),
+        new RegExp(`<meta[^>]*property="${name}"[^>]*content="([^"]*)"`, 'i'),
+        new RegExp(`<meta[^>]*content="([^"]*)"[^>]*property="${name}"`, 'i'),
       ];
-      for (const sel of featSels) {
-        qa(sel).forEach(el => {
-          const t = el.innerText.trim();
-          if (t && t.length < 60 && !features.includes(t)) features.push(t);
-        });
-        if (features.length >= 6) break;
-      }
-      if (features.length === 0) {
-        if (beds) features.push(beds + ' Bedroom' + (parseInt(beds) > 1 ? 's' : ''));
-        if (size) features.push(size + ' sq ft');
-        if (tenure) features.push(tenure);
-      }
-
-      // ── Photos — grab from img tags, prefer large gallery images ──
-      const photos = [];
-      const seen = new Set();
-
-      // PropertyFinder images are on static.shared.propertyfinder.ae
-      qa('img').forEach(img => {
-        const src = img.src || img.dataset.src || img.dataset.lazySrc || '';
-        if (
-          src &&
-          src.startsWith('http') &&
-          !seen.has(src) &&
-          !src.includes('logo') &&
-          !src.includes('avatar') &&
-          !src.includes('icon') &&
-          !src.includes('placeholder') &&
-          !src.includes('map') &&
-          (src.includes('propertyfinder') || src.includes('static.shared') || src.includes('images/listing')) &&
-          photos.length < 4
-        ) {
-          photos.push(src);
-          seen.add(src);
-        }
-      });
-
-      // Wider fallback if no PF images found
-      if (photos.length === 0) {
-        qa('img').forEach(img => {
-          const src = img.src || '';
-          const w = img.naturalWidth || img.width || 0;
-          if (src && src.startsWith('http') && w > 300 && !seen.has(src) && photos.length < 4) {
-            photos.push(src);
-            seen.add(src);
-          }
-        });
-      }
-
-      // ── Floor plan ──
-      let floorplan = '';
-      qa('img').forEach(img => {
-        const src = img.src || img.dataset.src || '';
-        const alt = (img.alt || '').toLowerCase();
-        if (!floorplan && (alt.includes('floor') || alt.includes('plan') || src.toLowerCase().includes('floor'))) {
-          floorplan = src;
-        }
-      });
-
-      return { building, area, ref, beds, baths, size, price, tenure, description, features, photos, floorplan };
-    });
-
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-      body: JSON.stringify(data),
+      for (const p of patterns) { const m = html.match(p); if (m) return m[1]; }
+      return '';
     };
+
+    // ── Clean text ──
+    const cleanHtml = html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '');
+    const text = cleanHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+    // ── Building ──
+    let building = (jsonLD && jsonLD.name) || metaContent('og:title') || '';
+    building = building.replace(/\s*[-|].*?(PropertyFinder|Bayut|betterhomes).*/i, '').trim();
+    building = building.replace(/^[\d\w\s]+\|\s*/i, '').trim();
+
+    // ── Area ──
+    let area = '';
+    if (jsonLD && jsonLD.address) area = jsonLD.address.addressLocality || '';
+    if (!area) {
+      const m = (metaContent('og:title') || '').match(/in\s+([^,|]+(?:,\s*[^,|]+)?)\s*[-|]/i);
+      if (m) area = m[1].trim();
+    }
+    if (!area) area = 'Dubai';
+
+    // ── Beds / Baths / Size ──
+    let beds = '', baths = '', size = '';
+    if (jsonLD) {
+      beds  = String(jsonLD.numberOfRooms || jsonLD.numberOfBedrooms || '');
+      baths = String(jsonLD.numberOfBathroomsTotal || jsonLD.numberOfBathrooms || '');
+      if (jsonLD.floorSize) size = String(jsonLD.floorSize.value || '');
+    }
+    if (!beds)  { const m = text.match(/(\d+)\s*Bed(?:room)?s?/i);  if (m) beds  = m[1]; }
+    if (!baths) { const m = text.match(/(\d+)\s*Bath(?:room)?s?/i); if (m) baths = m[1]; }
+    if (!size)  { const m = text.match(/([\d,]+)\s*sq\.?\s*(?:ft|feet)/i); if (m) size = m[1].replace(/,/g,''); }
+
+    // ── Price ──
+    let price = '', tenure = '';
+    if (jsonLD && jsonLD.offers && jsonLD.offers.price) {
+      price = 'AED ' + Number(jsonLD.offers.price).toLocaleString();
+    }
+    if (!price) {
+      const m = text.match(/AED\s*([\d,]+)/i);
+      if (m) { const raw = m[1].replace(/,/g,''); if (raw.length >= 5) price = 'AED ' + Number(raw).toLocaleString(); }
+    }
+    if (text.toLowerCase().includes('freehold')) tenure = 'Freehold';
+    else if (text.toLowerCase().includes('leasehold')) tenure = 'Leasehold';
+
+    // ── Description ──
+    let description = (jsonLD && jsonLD.description) || metaContent('og:description') || metaContent('description') || '';
+    description = description.replace(/\.\.\.$/, '').trim();
+
+    // ── Features ──
+    const features = [];
+    if (beds)   features.push(beds + ' Bedroom' + (parseInt(beds) > 1 ? 's' : ''));
+    if (baths)  features.push(baths + ' Bathroom' + (parseInt(baths) > 1 ? 's' : ''));
+    if (size)   features.push(size + ' sq ft');
+    if (tenure) features.push(tenure);
+
+    // ── Photos ──
+    const photos = [];
+    const ogImage = metaContent('og:image');
+    if (ogImage) photos.push(ogImage);
+    if (jsonLD && jsonLD.image) {
+      const imgs = Array.isArray(jsonLD.image) ? jsonLD.image : [jsonLD.image];
+      imgs.forEach(img => {
+        const src = typeof img === 'string' ? img : (img.url || img.contentUrl || '');
+        if (src && !photos.includes(src) && photos.length < 4) photos.push(src);
+      });
+    }
+    const cdnMatches = [...html.matchAll(/https:\/\/static\.shared\.propertyfinder\.ae\/media\/images\/listing\/[^"'\s]+\.jpg/g)];
+    cdnMatches.forEach(m => { if (!photos.includes(m[0]) && photos.length < 4) photos.push(m[0]); });
+
+    // ── REF ──
+    let ref = '';
+    const refM = html.match(/(?:ref|reference)[^>]*?[:\s#]+([A-Z0-9]{6,})/i);
+    if (refM) ref = refM[1];
+
+    return res.status(200).json({ building, area, ref, beds, baths, size, price, tenure, description, features, photos, floorplan: '' });
 
   } catch (err) {
-    return {
-      statusCode: 500,
-      headers: { 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ error: err.message }),
-    };
-  } finally {
-    if (browser) await browser.close();
+    return res.status(500).json({ error: err.message });
   }
 };
