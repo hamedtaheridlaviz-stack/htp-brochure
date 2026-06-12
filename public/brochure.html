@@ -274,22 +274,24 @@
   if (!url) { document.getElementById('loading').style.display='none'; return; }
 
   try {
-    const res = await fetch('/.netlify/functions/scrape?url=' + encodeURIComponent(url));
+    const res = await fetch('/api/scrape?url=' + encodeURIComponent(url));
     if (!res.ok) throw new Error('Scraper HTTP ' + res.status);
     const d = await res.json();
     if (d.error) throw new Error(d.error);
 
     const fill = (cls, val) => document.querySelectorAll('.' + cls).forEach(el => el.textContent = val || '');
 
-    fill('d-building',    d.building    || '');
-    fill('d-area',        d.area        || '');
-    fill('d-ref',         d.ref         || '');
-    fill('d-beds',        d.beds        || '—');
-    fill('d-baths',       d.baths       || '—');
-    fill('d-size',        d.size        || '—');
-    fill('d-price',       d.price       || '');
-    fill('d-tenure',      d.tenure      || '');
-    fill('d-description', d.description || '');
+    fill('d-building',       d.building       || '');
+    fill('d-area',           d.area           || '');
+    fill('d-ref',            d.ref            || '');
+    fill('d-beds',           d.beds           || '—');
+    fill('d-baths',          d.baths          || '—');
+    fill('d-size',           d.size           || '—');
+    fill('d-price',          d.price          || '');
+    fill('d-tenure',         d.tenure         || '');
+    fill('d-marketing-title',d.marketingTitle || '');
+    const fixedDesc = "Betterhomes is proud to introduce this distinguished residence, set within one of Dubai's most prestigious residential destinations. Thoughtfully curated and impeccably presented, it offers a lifestyle defined by sophistication, privacy, and enduring appeal. For further information or to arrange a private viewing, please contact Hamed Taheri Dlaviz.";
+    fill('d-description', fixedDesc);
 
     if (d.features && d.features.length) {
       document.querySelectorAll('.d-feats').forEach(ul => {
