@@ -163,43 +163,52 @@
   .p2-agent-item svg{flex-shrink:0;opacity:.8;}
   .p2-agent-logo img{height:14px;filter:brightness(0) invert(1);opacity:.85;}
   @media print{
-    @page{
-      size: A5 landscape;
+    @page {
+      size: A4 portrait;
       margin: 0;
     }
-    html, body{
+    html, body {
       margin: 0;
       padding: 0;
+      width: 210mm;
       background: #fff;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
-    #toolbar,#loading,#error-msg{display:none!important;}
-    #brochure{
+    #toolbar,#loading,#error-msg { display: none !important; }
+
+    /* Put both pages side by side on one A4 sheet */
+    #brochure {
       margin: 0;
-      width: 100%;
+      width: 210mm;
+      height: 297mm;
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      page-break-inside: avoid;
     }
-    .page{
+    .page {
       box-shadow: none;
       margin: 0;
       padding: 0;
-      width: 210mm;
-      height: 148mm;
+      flex: 0 0 105mm;
+      width: 105mm;
+      height: 297mm;
       overflow: hidden;
-      page-break-after: always;
+      page-break-after: avoid;
       page-break-inside: avoid;
-      /* Scale content to fit A5 */
+      /* Scale each 794px wide page down to 105mm (~397px) */
       transform-origin: top left;
-      transform: scale(0.665);
-      margin-bottom: -100mm;
+      transform: scale(0.499);
+      margin-right: -52.5mm;
     }
-    /* Force all backgrounds to print */
-    .p-header,.pfoot,.p2-agent-bar{
+    /* Force all backgrounds */
+    .p-header, .pfoot, .p2-agent-bar {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       background: #1a4a3a !important;
     }
-    .p2-fp-top{
+    .p2-fp-top {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       background: #e8e3da !important;
