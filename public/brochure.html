@@ -215,7 +215,7 @@
     <div class="t-title">HAMED TAHERI PROPERTIES</div>
     <div class="t-sub">Print → Save as PDF to share with client</div>
   </div>
-  <button id="save-btn" onclick="printLandscape()">SAVE AS PDF</button>
+  <button id="save-btn" onclick="savePDF()">SAVE AS PDF</button>
 </div>
 
 <div id="brochure">
@@ -428,18 +428,19 @@
   }
 })();
 
-function printLandscape() {
-  // Force landscape by temporarily injecting a style
-  const style = document.createElement('style');
-  style.id = 'force-landscape';
-  style.textContent = '@page { size: A5 landscape; margin: 0; }';
-  document.head.appendChild(style);
-  window.print();
-  // Clean up after print dialog closes
-  setTimeout(() => {
-    const s = document.getElementById('force-landscape');
-    if (s) s.remove();
-  }, 1000);
+function savePDF() {
+  const params = new URLSearchParams(window.location.search);
+  const url = params.get('url');
+  if (!url) { window.print(); return; }
+  // Show loading state
+  const btn = document.getElementById('save-btn');
+  const orig = btn.textContent;
+  btn.textContent = 'GENERATING...';
+  btn.disabled = true;
+  // Call PDF API
+  window.location.href = '/api/pdf?url=' + encodeURIComponent(url);
+  // Reset button after delay
+  setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 4000);
 }
 </script>
 </body>
