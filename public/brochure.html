@@ -164,45 +164,26 @@
   .p2-agent-logo img{height:14px;filter:brightness(0) invert(1);opacity:.85;}
   @media print{
     @page {
-      size: A4 portrait;
+      size: A5 landscape;
       margin: 0;
     }
     html, body {
       margin: 0;
       padding: 0;
-      background: #fff;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
     #toolbar,#loading,#error-msg { display: none !important; }
-
-    /* Stack both pages vertically on one A4 sheet */
-    /* A4 portrait = 210 x 297mm */
-    /* Each brochure page = 794px wide, scaled to 210mm wide = scale 0.664 */
-    /* Scaled height = original height * 0.664, each gets 148.5mm (half of 297mm) */
-    #brochure {
-      margin: 0;
-      width: 210mm;
-      height: 297mm;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      page-break-inside: avoid;
-    }
+    #brochure { margin: 0; }
     .page {
       box-shadow: none;
       margin: 0;
-      padding: 0;
-      flex: 0 0 148.5mm;
-      width: 794px;
-      overflow: hidden;
-      page-break-after: avoid;
+      width: 100%;
+      height: 100vh;
+      page-break-after: always;
       page-break-inside: avoid;
-      transform-origin: top left;
-      transform: scale(0.664);
-      margin-bottom: -196px;
+      overflow: hidden;
     }
-    /* Force all backgrounds */
     .p-header, .pfoot, .p2-agent-bar {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
