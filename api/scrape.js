@@ -198,30 +198,41 @@ module.exports = async (req, res) => {
     if (size)   features.push(size + ' sq ft');
     if (tenure) features.push(tenure);
 
-    // ── Photos ──
+    // ── Photos — extract unique images by base filename ──
     const photos = [];
-    const seen = new Set();
-    const ogImage = metaContent('og:image');
-    if (ogImage && ogImage.startsWith('http') && !ogImage.includes('floorplan')) {
-      photos.push(ogImage); seen.add(ogImage);
-    }
-    // PF CDN listing images
-    const pfImgs = Array.from(html.matchAll(/https:\/\/static\.shared\.propertyfinder\.ae\/media\/images\/listing\/[A-Za-z0-9]+\/[^"'\s\\]+\.jpg/g));
-    for (const m of pfImgs) {
-      const src = m[0];
-      if (!seen.has(src) && !src.includes('floorplan') && photos.length < 5) {
-        photos.push(src); seen.add(src);
-      }
-    }
+    const seenUrls = new Set();
+    const seenFiles = new Set(); // dedupe by filename to avoid same image at different sizes
+
+    const addPhoto = (src) => {
+      if (!src || !src.startsWith('http')) return;
+      if (src.includes('floorplan') || src.includes('floor-plan')) return;
+      if (seenUrls.has(src)) return;
+      // Extract base filename to detect duplicates at different resolutions
+      const fileMatch = src.match(/\/([A-Za-z0-9_-]+)\.(jpg|png|webp)/i);
+      const fileKey = fileMatch ? fileMatch[1] : src;
+      if (seenFiles.has(fileKey)) return;
+      if (photos.length >= 5) return;
+      photos.push(src);
+      seenUrls.add(src);
+      seenFiles.add(fileKey);
+    };
+
+    // PF CDN listing images — these are the actual property photos
+    // Pattern from inspect: /media/images/listing/HASH/HASH/668x452.jpg
+    const pfImgs = Array.from(html.matchAll(/https:\/\/static\.shared\.propertyfinder\.ae\/media\/images\/listing\/[^"'\s\\]+\.jpg/g));
+    pfImgs.forEach(m => addPhoto(m[0]));
+
+    // JSON-LD images
     if (jsonLD && jsonLD.image) {
       const imgs = Array.isArray(jsonLD.image) ? jsonLD.image : [jsonLD.image];
       imgs.forEach(img => {
         const src = typeof img === 'string' ? img : (img.url || img.contentUrl || '');
-        if (src && src.startsWith('http') && !src.includes('floorplan') && !seen.has(src) && photos.length < 5) {
-          photos.push(src); seen.add(src);
-        }
+        addPhoto(src);
       });
     }
+
+    // og:image as last fallback
+    if (photos.length === 0) addPhoto(metaContent('og:image'));
 
     // ── Floor plan ──
     let floorplan = '';
