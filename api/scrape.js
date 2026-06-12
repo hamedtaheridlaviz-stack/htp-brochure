@@ -65,14 +65,29 @@ module.exports = async (req, res) => {
     building = building.replace(/^(?:Sale|Rent|Buy)\s+in\s+/i, '').trim();
     building = building.split('|')[0].split(':')[0].trim();
 
-    // ── Marketing title (e.g. "New To Market | C Type | Fully Renovated Unit") ──
-    // From h1 with class containing "title" on PropertyFinder
+    // ── Marketing title — PF puts it in h1 inside description section ──
     let marketingTitle = '';
-    const h1Match = html.match(/class="[^"]*title[^"]*"[^>]*>([^<]{10,120})<\/h1>/i);
-    if (h1Match) {
-      marketingTitle = h1Match[1].trim();
-      // Remove "Property Finder" if it crept in
-      marketingTitle = marketingTitle.replace(/\s*[\|\-]\s*Property\s*Finder.*/i, '').trim();
+    // From inspect: <h1 class="styles_desktop_title__j0uNx">New To Market | C Type | Fully Renovated Unit</h1>
+    // Also try __NEXT_DATA__ for the title field
+    const h1Matches = [...html.matchAll(/<h1[^>]*>([^<]{10,150})<\/h1>/gi)];
+    for (const m of h1Matches) {
+      const t = m[1].trim();
+      // Skip if it looks like a page title or contains "Property Finder"
+      if (t.toLowerCase().includes('property finder') || t.toLowerCase().includes('propertyfinder')) continue;
+      // Skip if it's just the building name
+      if (t === building) continue;
+      // Good candidate — likely the marketing title
+      marketingTitle = t.replace(/\s*[|\-]\s*Property\s*Finder.*/i, '').trim();
+      break;
+    }
+    // Fallback: try __NEXT_DATA__ for title/name fields
+    if (!marketingTitle && nextDataMatch) {
+      try {
+        const str = JSON.parse(nextDataMatch[1]);
+        const s = JSON.stringify(str);
+        const m = s.match(/"title"\s*:\s*"([^"]{10,150})"/);
+        if (m && !m[1].includes('Property Finder')) marketingTitle = m[1];
+      } catch(e) {}
     }
 
     // ── Area ──
@@ -108,52 +123,98 @@ module.exports = async (req, res) => {
     // ── Price — validate 100k to 500M AED ──
     let price = '', tenure = '';
 
-    // ── Price — target PropertyFinder's exact price element ──
+    // ── Price — PropertyFinder embeds price in __NEXT_DATA__ JSON script ──
     let price = '', tenure = '';
 
-    // Method 1: data-testid="property-price-value" — most reliable
-    const priceTestId = html.match(/data-testid="property-price-value"[^>]*>([\d,]+)</);
-    if (priceTestId) {
-      const raw = Number(priceTestId[1].replace(/,/g,''));
-      if (raw >= 100000 && raw <= 500000000) price = 'AED ' + raw.toLocaleString();
+    // Method 1: __NEXT_DATA__ — PF is a Next.js app, price is in the serialised store
+    const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (nextDataMatch) {
+      try {
+        const nextData = JSON.parse(nextDataMatch[1]);
+        // Traverse to find price — it's nested deep in props.pageProps
+        const str = JSON.stringify(nextData);
+        // Look for "price":{"value":5790000 or "listingPrice":5790000
+        const pricePatterns = [
+          /"price"\s*:\s*\{\s*"value"\s*:\s*(\d+)/,
+          /"listingPrice"\s*:\s*(\d+)/,
+          /"asking_price"\s*:\s*(\d+)/,
+          /"price"\s*:\s*(\d{5,9})[,\}]/,
+        ];
+        for (const pat of pricePatterns) {
+          const m = str.match(pat);
+          if (m) {
+            const raw = Number(m[1]);
+            if (raw >= 100000 && raw <= 500000000) {
+              price = 'AED ' + raw.toLocaleString();
+              break;
+            }
+          }
+        }
+      } catch(e) {}
     }
 
-    // Method 2: class containing "price--value" or "price__value"
+    // Method 2: Look for price in other inline JSON/script blocks
     if (!price) {
-      const priceClass = html.match(/class="[^"]*price[^"]*value[^"]*"[^>]*>([\d,]+)</i);
-      if (priceClass) {
-        const raw = Number(priceClass[1].replace(/,/g,''));
-        if (raw >= 100000 && raw <= 500000000) price = 'AED ' + raw.toLocaleString();
+      const scriptMatches = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)];
+      for (const sm of scriptMatches) {
+        const s = sm[1];
+        if (!s.includes('price') && !s.includes('Price')) continue;
+        const patterns = [
+          /"price"\s*:\s*(\d{6,9})/,
+          /"asking_price"\s*:\s*(\d{6,9})/,
+          /"listingPrice"\s*:\s*(\d{6,9})/,
+          /price["\s:]+(\d{6,9})/i,
+        ];
+        for (const pat of patterns) {
+          const m = s.match(pat);
+          if (m) {
+            const raw = Number(m[1]);
+            if (raw >= 100000 && raw <= 500000000) {
+              price = 'AED ' + raw.toLocaleString();
+              break;
+            }
+          }
+        }
+        if (price) break;
       }
     }
 
-    // Method 3: og:description usually has "AED X,XXX,XXX"
+    // Method 3: og:description — "AED 5,790,000" appears here
     if (!price) {
       const ogDesc = metaContent('og:description') || '';
-      const ogPriceM = ogDesc.match(/AED\s*([\d,]+)/i);
-      if (ogPriceM) {
-        const raw = Number(ogPriceM[1].replace(/,/g,''));
+      const m = ogDesc.match(/AED\s*([\d,]+)/i);
+      if (m) {
+        const raw = Number(m[1].replace(/,/g,''));
         if (raw >= 100000 && raw <= 500000000) price = 'AED ' + raw.toLocaleString();
       }
     }
 
-    // Method 4: scan all AED values, pick most frequent in valid range
+    // Method 4: page title sometimes has price
     if (!price) {
-      const allCandidates = [];
-      const allPriceMatches = [...text.matchAll(/AED\s*([\d,]+)/gi)];
-      for (const m of allPriceMatches) {
+      const ogTitle = metaContent('og:title') || '';
+      const m = ogTitle.match(/AED\s*([\d,]+)/i);
+      if (m) {
         const raw = Number(m[1].replace(/,/g,''));
-        if (raw >= 100000 && raw <= 500000000) allCandidates.push(raw);
+        if (raw >= 100000 && raw <= 500000000) price = 'AED ' + raw.toLocaleString();
       }
-      if (allCandidates.length > 0) {
+    }
+
+    // Method 5: scan ALL text, collect candidates, pick smallest reasonable (avoids 200M outlier)
+    if (!price) {
+      const candidates = [];
+      const allM = [...text.matchAll(/AED\s*([\d,]+)/gi)];
+      for (const m of allM) {
+        const raw = Number(m[1].replace(/,/g,''));
+        if (raw >= 100000 && raw <= 100000000) candidates.push(raw); // cap at 100M
+      }
+      if (candidates.length > 0) {
+        // Most frequent wins; ties go to smallest
         const freq = {};
-        allCandidates.forEach(v => freq[v] = (freq[v] || 0) + 1);
-        const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1] || a[0]-b[0]);
+        candidates.forEach(v => freq[v] = (freq[v]||0)+1);
+        const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1] || Number(a[0])-Number(b[0]));
         price = 'AED ' + Number(sorted[0][0]).toLocaleString();
       }
     }
-
-    // Collect ALL numbers from page, find most frequent reasonable price
 
     if (text.toLowerCase().includes('freehold')) tenure = 'Freehold';
     else if (text.toLowerCase().includes('leasehold')) tenure = 'Leasehold';
