@@ -32,10 +32,11 @@
   /* PAGE */
   #brochure{width:794px;margin:20px auto;}
   .page{
-    width:794px;background:var(--white);
+    width:794px;height:559px;background:var(--white);
     margin-bottom:16px;overflow:hidden;
     box-shadow:0 4px 20px rgba(0,0,0,.15);
     page-break-after:always;
+    display:flex;flex-direction:column;
   }
 
   /* HEADER — BetterHomes logo left, HAMED TAHERI right */
@@ -53,16 +54,16 @@
 
   /* PHOTO */
   .p1-photo{
-    width:100%;height:430px;background:#c5bdb0;
+    width:100%;flex:1;min-height:0;background:#c5bdb0;
     display:flex;align-items:center;justify-content:center;overflow:hidden;
   }
   .p1-photo img{width:100%;height:100%;object-fit:cover;}
   .p1-photo-ph{color:rgba(255,255,255,.45);font-size:11px;letter-spacing:4px;text-transform:uppercase;}
 
   /* P1 INFO */
-  .p1-bottom{padding:20px 28px 0;}
+  .p1-bottom{padding:12px 24px 0;flex-shrink:0;}
   .p1-ref{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
-  .p1-address-main{font-size:18px;font-weight:700;color:var(--green);line-height:1.2;}
+  .p1-address-main{font-size:16px;font-weight:700;color:var(--green);line-height:1.2;}
   .p1-address-sub{font-size:12px;color:var(--text);margin-top:3px;}
   .p1-price-row{display:flex;align-items:flex-end;justify-content:space-between;padding:14px 0 18px;}
   .p1-marketing-title{font-size:10px;color:var(--muted);margin-top:2px;margin-bottom:6px;font-style:italic;letter-spacing:.2px;}
@@ -89,8 +90,8 @@
   .pf-ci svg{flex-shrink:0;opacity:.8;}
 
   /* PAGE 2 */
-  .p2-body{display:flex;min-height:580px;}
-  .p2-left{width:330px;flex-shrink:0;display:flex;flex-direction:column;}
+  .p2-body{display:flex;flex:1;min-height:0;overflow:hidden;}
+  .p2-left{width:300px;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;}
   .p2-ph{flex:1;background:#c5bdb0;display:flex;align-items:center;justify-content:center;overflow:hidden;}
   .p2-ph img{width:100%;height:100%;object-fit:cover;}
   .p2-ph-label{color:rgba(255,255,255,.45);font-size:10px;letter-spacing:3px;text-transform:uppercase;}
@@ -164,29 +165,26 @@
   .p2-agent-logo img{height:14px;filter:brightness(0) invert(1);opacity:.85;}
   @media print{
     @page {
-      size: 210mm 148mm;
+      size: 794px 559px;
       margin: 0;
     }
     html, body {
-      width: 210mm;
       margin: 0;
       padding: 0;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
     #toolbar,#loading,#error-msg { display: none !important; }
-    #brochure { margin: 0; width: 210mm; }
+    #brochure { margin: 0; width: 794px; }
     .page {
       box-shadow: none;
-      width: 210mm !important;
-      height: 148mm !important;
+      width: 794px !important;
+      height: 559px !important;
       margin: 0 !important;
-      overflow: hidden;
       page-break-after: always;
       page-break-inside: avoid;
+      overflow: hidden;
     }
-    /* Scale page content to fit — 794px screen = 210mm print */
-    .page > * { zoom: 0.706; }
     .p-header, .pfoot, .p2-agent-bar {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
