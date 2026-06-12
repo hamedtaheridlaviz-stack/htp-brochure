@@ -174,15 +174,23 @@
       print-color-adjust: exact !important;
     }
     #toolbar,#loading,#error-msg { display: none !important; }
-    #brochure { margin: 0; }
+    #brochure {
+      margin: 0;
+      width: 210mm;
+    }
     .page {
       box-shadow: none;
-      margin: 0;
-      width: 100%;
-      height: 100vh;
+      margin: 0 !important;
+      width: 210mm;
+      height: 148mm;
+      overflow: hidden;
       page-break-after: always;
       page-break-inside: avoid;
-      overflow: hidden;
+      /* Scale 794px down to 210mm = 793.7px, so scale ≈ 1.0 */
+      /* But height needs to fit in 148mm ≈ 559px — scale to fit height */
+      transform-origin: top left;
+      transform: scale(0.706);
+      margin-bottom: -163px !important;
     }
     .p-header, .pfoot, .p2-agent-bar {
       -webkit-print-color-adjust: exact !important;
@@ -207,7 +215,7 @@
     <div class="t-title">HAMED TAHERI PROPERTIES</div>
     <div class="t-sub">Print → Save as PDF to share with client</div>
   </div>
-  <button id="save-btn" onclick="window.print()">SAVE AS PDF</button>
+  <button id="save-btn" onclick="printLandscape()">SAVE AS PDF</button>
 </div>
 
 <div id="brochure">
@@ -419,6 +427,20 @@
     document.getElementById('loading').style.display = 'none';
   }
 })();
+
+function printLandscape() {
+  // Force landscape by temporarily injecting a style
+  const style = document.createElement('style');
+  style.id = 'force-landscape';
+  style.textContent = '@page { size: A5 landscape; margin: 0; }';
+  document.head.appendChild(style);
+  window.print();
+  // Clean up after print dialog closes
+  setTimeout(() => {
+    const s = document.getElementById('force-landscape');
+    if (s) s.remove();
+  }, 1000);
+}
 </script>
 </body>
 </html>
