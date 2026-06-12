@@ -3,5 +3,9 @@
   "version": "1.0.0",
   "engines": {
     "node": "24.x"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "^123.0.1",
+    "puppeteer-core": "^22.0.0"
   }
 }
