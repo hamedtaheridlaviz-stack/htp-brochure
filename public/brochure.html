@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Property Brochure — Hamed Taheri Properties</title>
+<meta property="og:title" content="Hamed Taheri Properties">
+<meta property="og:image" content="https://htp-brochure.vercel.app/bh_logo_tight_highres.png">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://htp-brochure.vercel.app/">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Hamed Taheri Properties">
+<meta name="twitter:image" content="https://htp-brochure.vercel.app/bh_logo_tight_highres.png">
+
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
   :root{
@@ -88,6 +97,33 @@
   .pf-ci{display:flex;align-items:center;gap:6px;font-size:10px;color:rgba(255,255,255,.75);}
   .pf-ci svg{flex-shrink:0;opacity:.8;}
 
+  /* Force iPhone/Safari auto-detected phone/email links to stay white on navy */
+  .pf-ci a,
+  .p2-agent-ci a,
+  .p2-agent-item a{
+    color:var(--white)!important;
+    text-decoration:none!important;
+    font-weight:inherit;
+  }
+  .pf-ci a:visited,
+  .p2-agent-ci a:visited,
+  .p2-agent-item a:visited,
+  .pf-ci a:hover,
+  .p2-agent-ci a:hover,
+  .p2-agent-item a:hover{
+    color:var(--white)!important;
+    text-decoration:none!important;
+  }
+  a[x-apple-data-detectors]{
+    color:var(--white)!important;
+    text-decoration:none!important;
+    font-size:inherit!important;
+    font-family:inherit!important;
+    font-weight:inherit!important;
+    line-height:inherit!important;
+  }
+
+
   /* PAGE 2 */
   .p2-body{display:flex;min-height:580px;}
   .p2-left{width:330px;flex-shrink:0;display:flex;flex-direction:column;}
@@ -99,9 +135,9 @@
   .p2-fp-lbl{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);text-align:center;margin-top:4px;}
 
   .p2-right{flex:1;padding:26px 22px;}
-  .p2-title-main{font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:400;color:var(--green);letter-spacing:-.3px;}
-  .p2-title-sub{font-size:13px;color:var(--muted);margin-bottom:12px;letter-spacing:.2px;}
-  .p2-icons{display:flex;align-items:center;gap:18px;padding-bottom:12px;border-bottom:1px solid #eee;margin-bottom:14px;}
+  .p2-title-main{font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:400;color:var(--green);letter-spacing:-.3px;margin-bottom:10px;}
+  .p2-title-sub{font-size:13px;color:var(--muted);margin-bottom:18px;letter-spacing:.2px;}
+  .p2-icons{display:flex;align-items:center;gap:18px;padding-bottom:14px;border-bottom:1px solid #eee;margin-bottom:22px;}
   .p2-icon{display:flex;align-items:center;gap:5px;}
   .p2-icon svg{color:var(--green);}
   .p2-icon-num{font-size:14px;font-weight:700;}
