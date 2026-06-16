@@ -1,6 +1,13 @@
 // api/brochure.js
-// WhatsApp / bots  → returns OG-tag HTML (rich preview with property photo)
-// Real browsers    → 302 redirect to the static /brochure page
+// WhatsApp/bots → OG-tag HTML with rich preview
+// Real browsers  → 302 redirect to static /brochure page
+//
+// Supports query params:
+//   ?url=    PropertyFinder listing URL (required)
+//   ?photo=  Direct image URL (optional, skips scraping)
+//   ?title=  Property title override (optional)
+//   ?beds=   Bedrooms (optional)
+//   ?price=  Price (optional)
 
 function esc(str) {
   return String(str || '')
@@ -11,60 +18,82 @@ function esc(str) {
 }
 
 module.exports = async (req, res) => {
-  const pfUrl = req.query.url;
-  const ua    = req.headers['user-agent'] || '';
+  const pfUrl    = req.query.url;
+  const photoParam = req.query.photo;
+  const titleParam = req.query.title;
+  const bedsParam  = req.query.beds;
+  const priceParam = req.query.price;
+  const ua         = req.headers['user-agent'] || '';
 
-  // Detect social media / messaging crawlers
   const isBot = /whatsapp|facebookexternalhit|twitterbot|linkedinbot|slackbot|telegrambot|discordbot|googlebot/i.test(ua);
 
-  // Real human → redirect straight to the static brochure page
+  // Real human → redirect to static brochure page
   if (!isBot) {
-    const dest = pfUrl
-      ? `/brochure?url=${encodeURIComponent(pfUrl)}`
-      : '/brochure';
+    const dest = pfUrl ? `/brochure?url=${encodeURIComponent(pfUrl)}` : '/brochure';
     res.writeHead(302, { Location: dest });
     res.end();
     return;
   }
 
-  // ── Bot: build dynamic OG tags ───────────────────────────────────────────
+  // ── Bot: build OG tags ───────────────────────────────────────────────────
   const host    = req.headers.host;
   const proto   = req.headers['x-forwarded-proto'] || 'https';
-  const pageUrl = pfUrl
-    ? `${proto}://${host}/api/brochure?url=${encodeURIComponent(pfUrl)}`
-    : `${proto}://${host}/brochure`;
-  const redirect = pfUrl
-    ? `/brochure?url=${encodeURIComponent(pfUrl)}`
-    : '/brochure';
+  const redirect = pfUrl ? `/brochure?url=${encodeURIComponent(pfUrl)}` : '/brochure';
+  const pageUrl  = `${proto}://${host}/api/brochure?url=${encodeURIComponent(pfUrl || '')}`;
 
   let title       = 'Hamed Taheri Properties – Dubai';
   let description = 'Luxury residential properties in Dubai. Contact Hamed Taheri +971 58 517 1746';
   let image       = `${proto}://${host}/bh_logo_tight_highres.png`;
 
-  if (pfUrl) {
+  // If params passed directly — use them (fast, no scraping needed)
+  if (titleParam || bedsParam || priceParam) {
+    title = [
+      titleParam,
+      bedsParam  ? `${bedsParam} BR`    : null,
+      priceParam ? `AED ${priceParam}`  : null,
+      'Hamed Taheri Properties'
+    ].filter(Boolean).join(' | ');
+
+    description = [
+      bedsParam  ? `${bedsParam} Bedroom` : null,
+      priceParam ? `AED ${priceParam}`    : null,
+      'Contact Hamed Taheri: +971 58 517 1746'
+    ].filter(Boolean).join(' · ');
+  }
+
+  if (photoParam) {
+    image = photoParam;
+  } else if (pfUrl) {
+    // Try scraping — but with a short timeout so WhatsApp doesn't give up
     try {
-      const scrapeUrl = `${proto}://${host}/api/scrape?url=${encodeURIComponent(pfUrl)}`;
-      const r = await fetch(scrapeUrl);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000); // 4s timeout
+      const r = await fetch(
+        `${proto}://${host}/api/scrape?url=${encodeURIComponent(pfUrl)}`,
+        { signal: controller.signal }
+      );
+      clearTimeout(timeout);
       const d = await r.json();
 
       if (!d.error) {
-        title = [
-          d.building,
-          d.beds  ? `${d.beds} BR`      : null,
-          d.price ? `AED ${d.price}`    : null,
-          'Hamed Taheri Properties'
-        ].filter(Boolean).join(' | ');
+        if (!titleParam) {
+          title = [
+            d.building,
+            d.beds  ? `${d.beds} BR`   : null,
+            d.price ? `AED ${d.price}` : null,
+            'Hamed Taheri Properties'
+          ].filter(Boolean).join(' | ');
 
-        description = [
-          d.marketingTitle || d.area || '',
-          d.size ? `${d.size} sqft`     : null,
-          'Contact: +971 58 517 1746'
-        ].filter(Boolean).join(' · ');
-
+          description = [
+            d.marketingTitle || d.area || '',
+            d.size ? `${d.size} sqft`   : null,
+            'Contact: +971 58 517 1746'
+          ].filter(Boolean).join(' · ');
+        }
         if (d.photos && d.photos[0]) image = d.photos[0];
       }
     } catch (_) {
-      // Use defaults if scrape fails — still returns valid OG tags
+      // Timed out or failed — use logo fallback
     }
   }
 
