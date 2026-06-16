@@ -1,11 +1,19 @@
 {
+  "version": 2,
+  "builds": [
+    { "src": "public/brochure.html", "use": "@vercel/static" },
+    { "src": "api/scrape.js", "use": "@vercel/node" },
+    { "src": "api/pdf.js", "use": "@vercel/node" },
+    { "src": "api/preview.js", "use": "@vercel/node" },
+    { "src": "api/brochure.js", "use": "@vercel/node" }
+  ],
   "routes": [
-    {
-      "src": "/brochure",
-      "dest": "/api/brochure"
-    },
-    {
-      "handle": "filesystem"
-    }
+    { "src": "/api/scrape", "dest": "/api/scrape.js" },
+    { "src": "/api/pdf", "dest": "/api/pdf.js" },
+    { "src": "/api/preview", "dest": "/api/preview.js" },
+    { "src": "/api/brochure", "dest": "/api/brochure.js" },
+    { "src": "/preview", "dest": "/api/preview.js" },
+    { "src": "/brochure", "dest": "/public/brochure.html" },
+    { "src": "/", "dest": "/public/brochure.html" }
   ]
 }
