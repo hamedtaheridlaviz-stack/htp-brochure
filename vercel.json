@@ -4,17 +4,14 @@
     { "src": "public/brochure.html", "use": "@vercel/static" },
     { "src": "api/scrape.js", "use": "@vercel/node" },
     { "src": "api/preview.js", "use": "@vercel/node" },
-    { "src": "api/brochure.js", "use": "@vercel/node" },
-    { "src": "api/p.js", "use": "@vercel/node" }
+    { "src": "api/brochure.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/api/scrape",              "dest": "/api/scrape.js" },
-    { "src": "/api/preview",             "dest": "/api/preview.js" },
-    { "src": "/api/brochure",            "dest": "/api/brochure.js" },
-    { "src": "/api/p",                   "dest": "/api/p.js" },
-    { "src": "/p/([^/]+)/([0-9]+)",      "dest": "/api/p.js?slug=$1&id=$2" },
-    { "src": "/preview",                 "dest": "/api/preview.js" },
-    { "src": "/brochure",                "dest": "/public/brochure.html" },
-    { "src": "/",                        "dest": "/public/brochure.html" }
+    { "src": "/api/scrape",   "dest": "/api/scrape.js" },
+    { "src": "/api/preview",  "dest": "/api/preview.js" },
+    { "src": "/api/brochure", "dest": "/api/brochure.js" },
+    { "src": "/preview",      "dest": "/api/preview.js" },
+    { "src": "/brochure",     "dest": "/public/brochure.html" },
+    { "src": "/",             "dest": "/public/brochure.html" }
   ]
 }
