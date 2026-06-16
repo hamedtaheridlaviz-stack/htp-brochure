@@ -1,5 +1,3 @@
-const fs   = require('fs');
-const path = require('path');
 const https = require('https');
 const http  = require('http');
 
@@ -11,7 +9,6 @@ function esc(str) {
     .replace(/>/g, '&gt;');
 }
 
-// HTTP/HTTPS GET helper — avoids needing node-fetch
 function httpGet(url) {
   return new Promise((resolve, reject) => {
     const lib = url.startsWith('https') ? https : http;
@@ -20,7 +17,7 @@ function httpGet(url) {
       res.on('data', chunk => { data += chunk; });
       res.on('end', () => {
         try { resolve(JSON.parse(data)); }
-        catch (e) { reject(new Error('JSON parse failed: ' + data.slice(0, 100))); }
+        catch (e) { reject(new Error('JSON parse failed')); }
       });
     }).on('error', reject);
   });
@@ -28,102 +25,83 @@ function httpGet(url) {
 
 module.exports = async (req, res) => {
   const pfUrl = req.query.url;
+  const ua    = req.headers['user-agent'] || '';
 
-  // Read the HTML file from public/
-  const htmlPath = path.join(process.cwd(), 'public', 'brochure.html');
-  let html;
-  try {
-    html = fs.readFileSync(htmlPath, 'utf8');
-  } catch (e) {
-    res.status(500).send('Could not read brochure.html: ' + e.message);
+  // Detect WhatsApp / social media crawlers
+  const isBot = /whatsapp|facebookexternalhit|twitterbot|linkedinbot|slackbot|telegrambot|discordbot|googlebot/i.test(ua);
+
+  // If real human — redirect to the static brochure page
+  if (!isBot) {
+    const dest = pfUrl
+      ? `/brochure?url=${encodeURIComponent(pfUrl)}`
+      : '/brochure';
+    res.writeHead(302, { Location: dest });
+    res.end();
     return;
   }
+
+  // ── Bot path: build OG-tag HTML ──────────────────────────────────────────
+  let title       = 'Hamed Taheri Properties – Dubai';
+  let description = 'Luxury residential properties in Dubai. Contact Hamed Taheri +971 58 517 1746';
+  let image       = `https://${req.headers.host}/bh_logo_tight_highres.png`;
+  const pageUrl   = pfUrl
+    ? `https://${req.headers.host}/api/brochure?url=${encodeURIComponent(pfUrl)}`
+    : `https://${req.headers.host}/brochure`;
+  const redirect  = pfUrl
+    ? `/brochure?url=${encodeURIComponent(pfUrl)}`
+    : '/brochure';
 
   if (pfUrl) {
     try {
       const proto = req.headers['x-forwarded-proto'] || 'https';
       const host  = req.headers.host;
-      const scrapeUrl = `${proto}://${host}/api/scrape?url=${encodeURIComponent(pfUrl)}`;
-
-      const d = await httpGet(scrapeUrl);
+      const d = await httpGet(`${proto}://${host}/api/scrape?url=${encodeURIComponent(pfUrl)}`);
 
       if (!d.error) {
-        const title = [
+        title = [
           d.building,
           d.beds ? `${d.beds} BR` : null,
           d.price ? `AED ${d.price}` : null,
           'Hamed Taheri Properties'
         ].filter(Boolean).join(' | ');
 
-        const description = [
+        description = [
           d.marketingTitle || d.area || '',
           d.size ? `${d.size} sqft` : null,
-          'Contact Hamed Taheri +971 58 517 1746'
+          'Contact: +971 58 517 1746'
         ].filter(Boolean).join(' · ');
 
-        const image = (d.photos && d.photos[0])
-          ? d.photos[0]
-          : `https://${host}/bh_logo_tight_highres.png`;
-
-        const pageUrl = `https://${host}/brochure?url=${encodeURIComponent(pfUrl)}`;
-
-        // Update <title>
-        html = html.replace(
-          /<title>[^<]*<\/title>/i,
-          `<title>${esc(title)}</title>`
-        );
-
-        // Update og:description (add if missing)
-        if (html.includes('og:description')) {
-          html = html.replace(
-            /(<meta\s+property="og:description"\s+content=")[^"]*(")/i,
-            `$1${esc(description)}$2`
-          );
-        } else {
-          html = html.replace(
-            /(<meta\s+property="og:title")/i,
-            `<meta property="og:description" content="${esc(description)}">\n<meta property="og:title"`
-          );
-        }
-
-        // Update og:title
-        html = html.replace(
-          /(<meta\s+property="og:title"\s+content=")[^"]*(")/i,
-          `$1${esc(title)}$2`
-        );
-
-        // Update og:image
-        html = html.replace(
-          /(<meta\s+property="og:image"\s+content=")[^"]*(")/i,
-          `$1${esc(image)}$2`
-        );
-
-        // Update og:url
-        if (html.includes('og:url')) {
-          html = html.replace(
-            /(<meta\s+property="og:url"\s+content=")[^"]*(")/i,
-            `$1${esc(pageUrl)}$2`
-          );
-        }
-
-        // Update twitter tags
-        html = html
-          .replace(
-            /(<meta\s+name="twitter:title"\s+content=")[^"]*(")/i,
-            `$1${esc(title)}$2`
-          )
-          .replace(
-            /(<meta\s+name="twitter:image"\s+content=")[^"]*(")/i,
-            `$1${esc(image)}$2`
-          );
+        if (d.photos && d.photos[0]) image = d.photos[0];
       }
     } catch (e) {
-      console.error('OG injection error:', e.message);
-      // Fall through — serve static HTML unchanged
+      // Use defaults if scrape fails
     }
   }
 
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${esc(title)}</title>
+<meta property="og:type"        content="website">
+<meta property="og:title"       content="${esc(title)}">
+<meta property="og:description" content="${esc(description)}">
+<meta property="og:image"       content="${esc(image)}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url"         content="${esc(pageUrl)}">
+<meta name="twitter:card"        content="summary_large_image">
+<meta name="twitter:title"       content="${esc(title)}">
+<meta name="twitter:description" content="${esc(description)}">
+<meta name="twitter:image"       content="${esc(image)}">
+<meta http-equiv="refresh" content="0; url=${esc(redirect)}">
+</head>
+<body>
+<a href="${esc(redirect)}">${esc(title)}</a>
+</body>
+</html>`;
+
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+  res.setHeader('Cache-Control', 'no-cache');
   res.end(html);
 };
