@@ -1,9 +1,7 @@
-// api/brochure.js
-// Add this file to your project root /api/ folder
-// Then add to vercel.json: { "rewrites": [{ "source": "/brochure", "destination": "/api/brochure" }] }
-
-const fs = require('fs');
+const fs   = require('fs');
 const path = require('path');
+const https = require('https');
+const http  = require('http');
 
 function esc(str) {
   return String(str || '')
@@ -13,96 +11,119 @@ function esc(str) {
     .replace(/>/g, '&gt;');
 }
 
+// HTTP/HTTPS GET helper — avoids needing node-fetch
+function httpGet(url) {
+  return new Promise((resolve, reject) => {
+    const lib = url.startsWith('https') ? https : http;
+    lib.get(url, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(new Error('JSON parse failed: ' + data.slice(0, 100))); }
+      });
+    }).on('error', reject);
+  });
+}
+
 module.exports = async (req, res) => {
   const pfUrl = req.query.url;
 
-  // Read the static HTML file
-  // Adjust path below if your brochure.html lives somewhere else
+  // Read the HTML file from public/
   const htmlPath = path.join(process.cwd(), 'public', 'brochure.html');
-  let html = fs.existsSync(htmlPath)
-    ? fs.readFileSync(htmlPath, 'utf8')
-    : fs.readFileSync(path.join(process.cwd(), 'brochure.html'), 'utf8');
+  let html;
+  try {
+    html = fs.readFileSync(htmlPath, 'utf8');
+  } catch (e) {
+    res.status(500).send('Could not read brochure.html: ' + e.message);
+    return;
+  }
 
   if (pfUrl) {
     try {
-      // Reuse your existing /api/scrape endpoint
       const proto = req.headers['x-forwarded-proto'] || 'https';
       const host  = req.headers.host;
-      const scrapeRes = await fetch(
-        `${proto}://${host}/api/scrape?url=${encodeURIComponent(pfUrl)}`
-      );
-      const d = await scrapeRes.json();
+      const scrapeUrl = `${proto}://${host}/api/scrape?url=${encodeURIComponent(pfUrl)}`;
+
+      const d = await httpGet(scrapeUrl);
 
       if (!d.error) {
-        // Build dynamic values
         const title = [
           d.building,
           d.beds ? `${d.beds} BR` : null,
           d.price ? `AED ${d.price}` : null,
-          'BetterHomes'
+          'Hamed Taheri Properties'
         ].filter(Boolean).join(' | ');
 
         const description = [
-          d.marketingTitle || d.area,
+          d.marketingTitle || d.area || '',
           d.size ? `${d.size} sqft` : null,
           'Contact Hamed Taheri +971 58 517 1746'
         ].filter(Boolean).join(' · ');
 
-        const image = (d.photos && d.photos[0]) ||
-          'https://htp-brochure.vercel.app/bh_logo_tight_highres.png';
+        const image = (d.photos && d.photos[0])
+          ? d.photos[0]
+          : `https://${host}/bh_logo_tight_highres.png`;
 
         const pageUrl = `https://${host}/brochure?url=${encodeURIComponent(pfUrl)}`;
 
-        // Inject into <title>
+        // Update <title>
         html = html.replace(
-          /<title>[^<]*<\/title>/,
+          /<title>[^<]*<\/title>/i,
           `<title>${esc(title)}</title>`
         );
 
-        // OG tags
-        html = html
-          .replace(/(<meta property="og:title"\s+content=")[^"]*(")/,
-            `$1${esc(title)}$2`)
-          .replace(/(<meta property="og:image"\s+content=")[^"]*(")/,
-            `$1${esc(image)}$2`)
-          .replace(/(<meta property="og:url"\s+content=")[^"]*(")/,
-            `$1${esc(pageUrl)}$2`);
-
-        // Add og:description if not present, else replace
+        // Update og:description (add if missing)
         if (html.includes('og:description')) {
           html = html.replace(
-            /(<meta property="og:description"\s+content=")[^"]*(")/,
+            /(<meta\s+property="og:description"\s+content=")[^"]*(")/i,
             `$1${esc(description)}$2`
           );
         } else {
           html = html.replace(
-            /<meta property="og:title"/,
+            /(<meta\s+property="og:title")/i,
             `<meta property="og:description" content="${esc(description)}">\n<meta property="og:title"`
           );
         }
 
-        // Twitter card tags
-        html = html
-          .replace(/(<meta name="twitter:title"\s+content=")[^"]*(")/,
-            `$1${esc(title)}$2`)
-          .replace(/(<meta name="twitter:image"\s+content=")[^"]*(")/,
-            `$1${esc(image)}$2`);
+        // Update og:title
+        html = html.replace(
+          /(<meta\s+property="og:title"\s+content=")[^"]*(")/i,
+          `$1${esc(title)}$2`
+        );
 
-        // Add twitter:description if not present
-        if (!html.includes('twitter:description')) {
+        // Update og:image
+        html = html.replace(
+          /(<meta\s+property="og:image"\s+content=")[^"]*(")/i,
+          `$1${esc(image)}$2`
+        );
+
+        // Update og:url
+        if (html.includes('og:url')) {
           html = html.replace(
-            /<meta name="twitter:card"/,
-            `<meta name="twitter:description" content="${esc(description)}">\n<meta name="twitter:card"`
+            /(<meta\s+property="og:url"\s+content=")[^"]*(")/i,
+            `$1${esc(pageUrl)}$2`
           );
         }
+
+        // Update twitter tags
+        html = html
+          .replace(
+            /(<meta\s+name="twitter:title"\s+content=")[^"]*(")/i,
+            `$1${esc(title)}$2`
+          )
+          .replace(
+            /(<meta\s+name="twitter:image"\s+content=")[^"]*(")/i,
+            `$1${esc(image)}$2`
+          );
       }
     } catch (e) {
       console.error('OG injection error:', e.message);
-      // Fall through — serve the static HTML unchanged
+      // Fall through — serve static HTML unchanged
     }
   }
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate');
+  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
   res.end(html);
 };
