@@ -1,20 +1,68 @@
-{
-  "version": 2,
-  "builds": [
-    { "src": "public/brochure.html", "use": "@vercel/static" },
-    { "src": "api/scrape.js", "use": "@vercel/node" },
-    { "src": "api/preview.js", "use": "@vercel/node" },
-    { "src": "api/brochure.js", "use": "@vercel/node" },
-    { "src": "api/p.js", "use": "@vercel/node" }
-  ],
-  "routes": [
-    { "src": "/api/scrape",              "dest": "/api/scrape.js" },
-    { "src": "/api/preview",             "dest": "/api/preview.js" },
-    { "src": "/api/brochure",            "dest": "/api/brochure.js" },
-    { "src": "/api/p",                   "dest": "/api/p.js" },
-    { "src": "/p/([^/]+)/([0-9]+)",      "dest": "/api/p.js?slug=$1&id=$2" },
-    { "src": "/preview",                 "dest": "/api/preview.js" },
-    { "src": "/brochure",                "dest": "/public/brochure.html" },
-    { "src": "/",                        "dest": "/public/brochure.html" }
-  ]
+// api/p.js — clean slug URLs for WhatsApp sharing
+// Route: /p/Marina-Wharf-1-2BR-2100000/95712255
+// vercel.json passes slug and id as query params
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+function parseSlug(slug) {
+  const s      = decodeURIComponent(slug || '').replace(/-/g,' ');
+  const bedsM  = s.match(/(\d+)\s*BR/i);
+  const priceM = s.match(/BR\s*(\d{5,})/i);
+  const beds   = bedsM  ? bedsM[1]  : '';
+  const price  = priceM ? parseInt(priceM[1]).toLocaleString() : '';
+  const title  = s.replace(/\s*\d+\s*BR\s*\d*/i,'').trim();
+  return { title, beds, price };
+}
+
+module.exports = (req, res) => {
+  const slug  = req.query.slug || '';
+  const id    = (req.query.id  || '').replace(/[^0-9]/g,'');
+  const proto = req.headers['x-forwarded-proto'] || 'https';
+  const host  = req.headers.host;
+  const ua    = req.headers['user-agent'] || '';
+  const isBot = /whatsapp|facebookexternalhit|twitterbot|linkedinbot|slackbot|telegrambot|discordbot|googlebot/i.test(ua);
+
+  const pfUrl        = id ? `https://www.propertyfinder.ae/en/plp/buy/${id}` : null;
+  const brochureDest = pfUrl ? `/brochure?url=${encodeURIComponent(pfUrl)}` : '/brochure';
+
+  if (!isBot) {
+    res.writeHead(302, { Location: brochureDest });
+    res.end();
+    return;
+  }
+
+  const { title, beds, price } = parseSlug(slug);
+  const ogTitle = [title, beds ? `${beds} BR` : null, price ? `AED ${price}` : null, 'Hamed Taheri Properties']
+    .filter(Boolean).join(' | ');
+  const ogDesc = [beds ? `${beds} Bedroom` : null, price ? `AED ${price}` : null, 'Contact Hamed Taheri: +971 58 517 1746']
+    .filter(Boolean).join(' · ');
+  const ogImage  = `${proto}://${host}/bh_logo_tight_highres.png`;
+  const pageUrl  = `${proto}://${host}/p/${encodeURIComponent(slug)}/${id}`;
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${esc(ogTitle)}</title>
+<meta property="og:type"         content="website">
+<meta property="og:title"        content="${esc(ogTitle)}">
+<meta property="og:description"  content="${esc(ogDesc)}">
+<meta property="og:image"        content="${esc(ogImage)}">
+<meta property="og:image:width"  content="400">
+<meta property="og:image:height" content="400">
+<meta property="og:url"          content="${esc(pageUrl)}">
+<meta name="twitter:card"        content="summary">
+<meta name="twitter:title"       content="${esc(ogTitle)}">
+<meta name="twitter:description" content="${esc(ogDesc)}">
+<meta name="twitter:image"       content="${esc(ogImage)}">
+<meta http-equiv="refresh"       content="0; url=${esc(brochureDest)}">
+</head>
+<body><a href="${esc(brochureDest)}">${esc(ogTitle)}</a></body>
+</html>`;
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.end(html);
+};
