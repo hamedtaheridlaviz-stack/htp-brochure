@@ -1,8 +1,11 @@
 {
-  "rewrites": [
+  "routes": [
     {
-      "source": "/brochure",
-      "destination": "/api/brochure"
+      "src": "/brochure",
+      "dest": "/api/brochure"
+    },
+    {
+      "handle": "filesystem"
     }
   ]
 }
