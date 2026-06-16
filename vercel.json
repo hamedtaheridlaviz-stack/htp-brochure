@@ -8,13 +8,13 @@
     { "src": "api/p.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/api/scrape",   "dest": "/api/scrape.js" },
-    { "src": "/api/preview",  "dest": "/api/preview.js" },
-    { "src": "/api/brochure", "dest": "/api/brochure.js" },
-    { "src": "/api/p",        "dest": "/api/p.js" },
-    { "src": "/p/(.*)",       "dest": "/api/p.js" },
-    { "src": "/preview",      "dest": "/api/preview.js" },
-    { "src": "/brochure",     "dest": "/public/brochure.html" },
-    { "src": "/",             "dest": "/public/brochure.html" }
+    { "src": "/api/scrape",              "dest": "/api/scrape.js" },
+    { "src": "/api/preview",             "dest": "/api/preview.js" },
+    { "src": "/api/brochure",            "dest": "/api/brochure.js" },
+    { "src": "/api/p",                   "dest": "/api/p.js" },
+    { "src": "/p/([^/]+)/([0-9]+)",      "dest": "/api/p.js?slug=$1&id=$2" },
+    { "src": "/preview",                 "dest": "/api/preview.js" },
+    { "src": "/brochure",                "dest": "/public/brochure.html" },
+    { "src": "/",                        "dest": "/public/brochure.html" }
   ]
 }
