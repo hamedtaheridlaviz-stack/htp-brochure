@@ -1,37 +1,31 @@
-// api/p.js  — clean slug URLs for WhatsApp sharing
-// URL format: /Marina-Wharf-1-2BR-2100000/95712255
-// Bots get OG tags, humans redirect to brochure
+// api/p.js — clean slug URLs for WhatsApp sharing
+// Route: /p/Marina-Wharf-1-2BR-2100000/95712255
+// vercel.json passes slug and id as query params
 
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 function parseSlug(slug) {
-  // Extract beds from slug e.g. "Marina-Wharf-1-2BR-2100000"
-  const bedsMatch  = slug.match(/(\d+)BR/i);
-  const priceMatch = slug.match(/BR-(\d+)/i);
-  const beds  = bedsMatch  ? bedsMatch[1]  : '';
-  const price = priceMatch ? parseInt(priceMatch[1]).toLocaleString() : '';
-  const title = slug
-    .replace(/-?\d+BR-\d+/i, '')
-    .replace(/-+/g, ' ').trim();
+  const s      = decodeURIComponent(slug || '').replace(/-/g,' ');
+  const bedsM  = s.match(/(\d+)\s*BR/i);
+  const priceM = s.match(/BR\s*(\d{5,})/i);
+  const beds   = bedsM  ? bedsM[1]  : '';
+  const price  = priceM ? parseInt(priceM[1]).toLocaleString() : '';
+  const title  = s.replace(/\s*\d+\s*BR\s*\d*/i,'').trim();
   return { title, beds, price };
 }
 
-module.exports = async (req, res) => {
-  const parts = (req.url || '').replace(/^\/p\//, '').split('/');
-  const slug  = decodeURIComponent(parts[0] || '');
-  const id    = (parts[1] || '').replace(/[^0-9]/g, '');
-
+module.exports = (req, res) => {
+  const slug  = req.query.slug || '';
+  const id    = (req.query.id  || '').replace(/[^0-9]/g,'');
   const proto = req.headers['x-forwarded-proto'] || 'https';
   const host  = req.headers.host;
   const ua    = req.headers['user-agent'] || '';
   const isBot = /whatsapp|facebookexternalhit|twitterbot|linkedinbot|slackbot|telegrambot|discordbot|googlebot/i.test(ua);
 
-  const pfUrl      = id ? `https://www.propertyfinder.ae/en/plp/buy/${id}` : null;
-  const brochureDest = pfUrl
-    ? `/brochure?url=${encodeURIComponent(pfUrl)}`
-    : '/brochure';
+  const pfUrl        = id ? `https://www.propertyfinder.ae/en/plp/buy/${id}` : null;
+  const brochureDest = pfUrl ? `/brochure?url=${encodeURIComponent(pfUrl)}` : '/brochure';
 
   if (!isBot) {
     res.writeHead(302, { Location: brochureDest });
@@ -40,40 +34,33 @@ module.exports = async (req, res) => {
   }
 
   const { title, beds, price } = parseSlug(slug);
-
   const ogTitle = [title, beds ? `${beds} BR` : null, price ? `AED ${price}` : null, 'Hamed Taheri Properties']
     .filter(Boolean).join(' | ');
   const ogDesc = [beds ? `${beds} Bedroom` : null, price ? `AED ${price}` : null, 'Contact Hamed Taheri: +971 58 517 1746']
     .filter(Boolean).join(' · ');
+  const ogImage  = `${proto}://${host}/bh_logo_tight_highres.png`;
+  const pageUrl  = `${proto}://${host}/p/${encodeURIComponent(slug)}/${id}`;
 
-  let ogImage = `${proto}://${host}/bh_logo_tight_highres.png`;
-  if (pfUrl) {
-    try {
-      const controller = new AbortController();
-      const t = setTimeout(() => controller.abort(), 4000);
-      const r = await fetch(`${proto}://${host}/api/scrape?url=${encodeURIComponent(pfUrl)}`, { signal: controller.signal });
-      clearTimeout(t);
-      const d = await r.json();
-      if (!d.error && d.photos && d.photos[0]) ogImage = d.photos[0];
-    } catch(_) {}
-  }
-
-  const pageUrl = `${proto}://${host}/p/${encodeURIComponent(slug)}/${id}`;
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
 <title>${esc(ogTitle)}</title>
-<meta property="og:type" content="website">
-<meta property="og:title" content="${esc(ogTitle)}">
-<meta property="og:description" content="${esc(ogDesc)}">
-<meta property="og:image" content="${esc(ogImage)}">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:url" content="${esc(pageUrl)}">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="${esc(ogTitle)}">
+<meta property="og:type"         content="website">
+<meta property="og:title"        content="${esc(ogTitle)}">
+<meta property="og:description"  content="${esc(ogDesc)}">
+<meta property="og:image"        content="${esc(ogImage)}">
+<meta property="og:image:width"  content="400">
+<meta property="og:image:height" content="400">
+<meta property="og:url"          content="${esc(pageUrl)}">
+<meta name="twitter:card"        content="summary">
+<meta name="twitter:title"       content="${esc(ogTitle)}">
 <meta name="twitter:description" content="${esc(ogDesc)}">
-<meta name="twitter:image" content="${esc(ogImage)}">
-<meta http-equiv="refresh" content="0; url=${esc(brochureDest)}">
-</head><body><a href="${esc(brochureDest)}">${esc(ogTitle)}</a></body></html>`;
+<meta name="twitter:image"       content="${esc(ogImage)}">
+<meta http-equiv="refresh"       content="0; url=${esc(brochureDest)}">
+</head>
+<body><a href="${esc(brochureDest)}">${esc(ogTitle)}</a></body>
+</html>`;
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache');
