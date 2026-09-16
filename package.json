@@ -1,0 +1,11 @@
+{
+  "name": "htp-brochure",
+  "version": "2.1.0",
+  "engines": {
+    "node": "24.x"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "^138.0.2",
+    "puppeteer-core": "^24.16.0"
+  }
+}
