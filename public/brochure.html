@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vero Private Brochure</title>
+<meta name="theme-color" content="#11171b">
+<style>
+  :root{--ink:#111417;--muted:#7c7f82;--line:#dadada;--dark:#11171b;--paper:#fff}
+  *{box-sizing:border-box} html,body{margin:0;padding:0;background:#eceeef;color:var(--ink);font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased}
+  body.loading #brochure{opacity:.22;filter:grayscale(.2)}
+  .toolbar{height:58px;background:#11171b;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:20;box-shadow:0 1px 6px #0002}
+  .toolbar-brand{display:flex;align-items:center;gap:14px}.toolbar-brand img{width:65px;filter:brightness(0) invert(1)}
+  .toolbar-copy{font-size:11px;letter-spacing:1.4px;text-transform:uppercase}.toolbar-copy small{display:block;color:#9aa0a4;font-size:9px;margin-top:2px;letter-spacing:.4px;text-transform:none}
+  .toolbar-actions{display:flex;gap:8px}.tool-btn{appearance:none;border:1px solid #394047;background:#fff;color:#11171b;border-radius:2px;padding:10px 17px;font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;cursor:pointer}.tool-btn.dark{background:#232a2f;color:#fff;border-color:#394047}
+  #status{position:fixed;left:50%;top:75px;transform:translateX(-50%);background:#11171b;color:#fff;padding:9px 14px;border-radius:20px;font-size:11px;z-index:30;display:none;box-shadow:0 4px 16px #0003}
+  #error{display:none;position:fixed;inset:auto 20px 20px 20px;z-index:40;background:#8d2525;color:white;padding:12px 16px;font-size:12px;border-radius:6px}
+  #brochure{width:297mm;margin:18px auto 42px;transition:.2s ease}
+  .page{width:297mm;height:210mm;background:var(--paper);position:relative;overflow:hidden;margin:0 auto 18px;box-shadow:0 6px 28px #0001;page-break-after:always;break-after:page}
+  .page:last-child{page-break-after:auto;break-after:auto}
+  .vero-logo{display:block;width:18mm;height:auto}.micro{font-size:6.6pt;letter-spacing:2.2px;text-transform:uppercase;color:#8a8d8f}
+  .rule{width:11mm;border-top:.4px solid #cfcfcf;margin:5mm 0 6mm}
+  .footer{position:absolute;left:13mm;right:13mm;bottom:8.4mm;display:grid;grid-template-columns:1fr 1fr 1fr;align-items:end;font-size:6.3pt;color:#8a8d8f;letter-spacing:.6px}.footer .centre{text-align:center;letter-spacing:1.4px}.footer .right{text-align:right}
+  /* cover */
+  .cover{display:grid;grid-template-columns:60% 40%}.cover-photo{width:100%;height:100%;object-fit:cover;background:#f2f2f2}.cover-side{padding:11.5mm 13mm 12mm 11.5mm;display:flex;flex-direction:column}.cover-title{font-size:19pt;font-weight:400;line-height:1.08;margin:3.2mm 0 8mm;letter-spacing:-.45px}.cover-building{font-size:9pt;color:#7c7f82;margin-bottom:0}.cover-price-label{margin-top:0}.cover-price{font-size:28pt;font-weight:400;line-height:1;margin-top:3.2mm;letter-spacing:-.8px}.cover-specs{border-top:.45px solid #d6d6d6;border-bottom:.45px solid #d6d6d6;margin-top:9mm;padding:5mm 0 4mm;display:grid;grid-template-columns:1fr 1fr;row-gap:6mm}.spec-label{font-size:6.2pt;letter-spacing:2px;text-transform:uppercase;color:#929497}.spec-value{font-size:12pt;margin-top:2mm}.cover-prepared{margin-top:auto;display:flex;justify-content:space-between;align-items:end;font-size:6.3pt;color:#898b8d;letter-spacing:.5px}
+  /* residence */
+  .residence{padding:12.5mm 13mm 11mm}.residence .topline{display:flex;justify-content:space-between;align-items:flex-start}.res-title{font-size:23pt;font-weight:400;letter-spacing:-.6px;line-height:1.08;margin:7mm 0 6mm}.res-building{font-size:9pt;color:#7b7e80}.about-label{font-size:6.6pt;letter-spacing:2.2px;color:#8c8f91;text-transform:uppercase;margin-bottom:2mm}.res-copy{font-size:9.1pt;line-height:1.52;color:#333;max-width:270mm;white-space:pre-line}.res-copy p{margin:0 0 5mm}.feature-lines{margin:4.8mm 0 5.8mm;line-height:1.48}
+  /* galleries */
+  .gallery{padding:12.5mm 11mm 11mm}.gallery-head{display:flex;justify-content:space-between;align-items:flex-start}.gallery-grid{margin-top:4.7mm;display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:66mm;gap:6.3mm 2.2mm}.gallery-grid img{width:100%;height:100%;object-fit:cover;background:#f2f2f2}.gallery-grid.four{grid-template-columns:repeat(3,1fr)}.gallery-grid .empty{background:#fff}.gallery .footer{left:3mm;right:3mm;bottom:5.5mm}
+  /* contact */
+  .contact{background:#11171b;color:#f4f4f4;padding:12.5mm 13mm 11mm}.contact .vero-logo{filter:brightness(0) invert(1)}.contact-top{display:flex;justify-content:space-between;align-items:flex-start}.contact .micro{color:#b5b7b9}.contact-hero{position:absolute;left:13mm;top:78mm}.contact-hero h2{font-size:34pt;font-weight:300;letter-spacing:-1.3px;margin:0 0 3.5mm}.contact-hero p{font-size:9pt;color:#aeb3b7;margin:0}.agent-block{position:absolute;left:13mm;bottom:23mm;display:grid;grid-template-columns:34mm 1fr;gap:8mm;align-items:end}.agent-photo{width:34mm;height:34mm;object-fit:cover}.agent-name{font-size:22pt;font-weight:300;margin-bottom:1.8mm}.agent-role{font-size:8pt;color:#aeb3b7;margin-bottom:7mm}.agent-contacts{display:flex;gap:28mm}.agent-field .micro{font-size:5.8pt;margin-bottom:2mm}.agent-field .value{font-size:10pt;color:#fff}.contact-disclaimer{position:absolute;left:13mm;bottom:10mm;font-size:5.7pt;color:#777d81}.contact-site{position:absolute;right:13mm;bottom:10mm;font-size:5.9pt;letter-spacing:1px;color:#868b8e}
+  @media(max-width:1200px){#brochure{transform-origin:top center;transform:scale(calc((100vw - 24px)/1122));margin-bottom:calc(-210mm + 75vw)}}
+  @media print{
+    @page{size:A4 landscape;margin:0}
+    html,body{background:#fff!important;width:auto!important;height:auto!important}
+    .toolbar,#status,#error{display:none!important}
+    #brochure{width:auto!important;margin:0!important;transform:none!important;opacity:1!important;filter:none!important}
+    .page{margin:0!important;box-shadow:none!important;width:297mm!important;height:210mm!important}
+    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  }
+</style>
+</head>
+<body class="loading">
+<div class="toolbar">
+  <div class="toolbar-brand"><img src="/assets/vero-logo.png" alt="Vero"><div class="toolbar-copy">Private Property Brochure<small>Vero Real Estate · prepared by Hamed Taheri</small></div></div>
+  <div class="toolbar-actions"><button class="tool-btn dark" onclick="copyShareLink()">Copy Link</button><button class="tool-btn" onclick="window.print()">Save as PDF</button></div>
+</div>
+<div id="status">Loading property…</div><div id="error"></div>
+<div id="brochure">
+  <section class="page cover">
+    <img class="cover-photo" id="coverPhoto" alt="Property">
+    <div class="cover-side">
+      <img class="vero-logo" src="/assets/vero-logo.png" alt="Vero">
+      <div class="micro" style="margin-top:7mm">Private Brochure</div>
+      <div class="cover-title d-title">Property</div>
+      <div class="cover-building d-building"></div><div class="rule"></div>
+      <div class="micro cover-price-label d-price-label">Asking Price</div>
+      <div class="cover-price d-price">AED —</div>
+      <div class="cover-specs">
+        <div><div class="spec-label">Beds</div><div class="spec-value d-beds">—</div></div>
+        <div><div class="spec-label">Baths</div><div class="spec-value d-baths">—</div></div>
+        <div><div class="spec-label">Size</div><div class="spec-value"><span class="d-size">—</span> sqft</div></div>
+        <div><div class="spec-label">Type</div><div class="spec-value d-type">Property</div></div>
+      </div>
+      <div class="cover-prepared"><span class="d-prepared">Prepared · Hamed Taheri</span><span>verouae.com</span></div>
+    </div>
+  </section>
+
+  <section class="page residence">
+    <div class="topline"><img class="vero-logo" src="/assets/vero-logo.png" alt="Vero"><div class="micro">The Residence</div></div>
+    <div class="res-title d-title">Property</div>
+    <div class="res-building d-building"></div><div class="rule"></div>
+    <div class="about-label">About This Home</div>
+    <div class="res-copy" id="descriptionBlock"></div>
+    <div class="footer"><span class="d-footer-name"></span><span class="centre">02</span><span class="right">verouae.com</span></div>
+  </section>
+
+  <section class="page gallery"><div class="gallery-head"><img class="vero-logo" src="/assets/vero-logo.png" alt="Vero"><div class="micro">Gallery</div></div><div class="gallery-grid" id="gallery1"></div><div class="footer"><span class="d-footer-name"></span><span class="centre">03</span><span class="right">verouae.com</span></div></section>
+  <section class="page gallery"><div class="gallery-head"><img class="vero-logo" src="/assets/vero-logo.png" alt="Vero"><div class="micro">Gallery</div></div><div class="gallery-grid" id="gallery2"></div><div class="footer"><span class="d-footer-name"></span><span class="centre">04</span><span class="right">verouae.com</span></div></section>
+  <section class="page gallery"><div class="gallery-head"><img class="vero-logo" src="/assets/vero-logo.png" alt="Vero"><div class="micro">Gallery</div></div><div class="gallery-grid" id="gallery3"></div><div class="footer"><span class="d-footer-name"></span><span class="centre">05</span><span class="right">verouae.com</span></div></section>
+
+  <section class="page contact">
+    <div class="contact-top"><img class="vero-logo" src="/assets/vero-logo.png" alt="Vero"><div class="micro">Arrange A Private Viewing</div></div>
+    <div class="contact-hero"><h2>Speak with your agent.</h2><p>We'd be delighted to arrange a private viewing at a time that suits you.</p></div>
+    <div class="agent-block"><img class="agent-photo" src="/assets/hamed-taheri.jpg" alt="Hamed Taheri"><div><div class="agent-name">Hamed Taheri</div><div class="agent-role">Property Consultant · Vero</div><div class="agent-contacts"><div class="agent-field"><div class="micro">Mobile</div><div class="value">+971 58 517 1746</div></div><div class="agent-field"><div class="micro">Email</div><div class="value">hamed@verouae.com</div></div></div></div></div>
+    <div class="contact-disclaimer">All information herein is believed accurate but is provided without warranty.</div><div class="contact-site">verouae.com</div>
+  </section>
+</div>
+<script>
+const qs=new URLSearchParams(location.search);const pfUrl=qs.get('url')||'';
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const fill=(cls,val)=>document.querySelectorAll('.'+cls).forEach(el=>el.textContent=val||'');
+function showStatus(s){const el=document.getElementById('status');el.textContent=s;el.style.display='block'}
+function hideStatus(){document.getElementById('status').style.display='none'}
+function inferType(url){const s=(url||'').toLowerCase();if(s.includes('/rent/'))return 'Apartment';if(s.includes('villa'))return 'Villa';if(s.includes('townhouse'))return 'Townhouse';if(s.includes('penthouse'))return 'Penthouse';return 'Apartment'}
+function isRent(url){return /\/rent\//i.test(url||'')}
+function cleanText(s){return String(s||'').replace(/\\n/g,'\n').replace(/\s+\n/g,'\n').replace(/\n\s+/g,'\n').trim()}
+function humanDate(){const d=new Date();return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`}
+function titleFeatures(d){const items=[];if(d.beds)items.push(`${d.beds} Bedroom${Number(d.beds)===1?'':'s'}`);if(d.baths)items.push(`${d.baths} Bathroom${Number(d.baths)===1?'':'s'}`);if(d.size)items.push(`BUA: ${Number(String(d.size).replace(/,/g,''))?.toLocaleString?.()||d.size} sqft`);const t=(d.marketingTitle||'').split('|').map(x=>x.trim()).filter(Boolean);t.forEach(x=>{if(!items.some(y=>y.toLowerCase()===x.toLowerCase())&&x.length<42)items.push(x)});return [...new Set(items)].slice(0,8)}
+function cleanedListingDescription(s){let x=cleanText(s);x=x.replace(/^[^.!?]{0,180}\b(?:is|are)\s+proud\s+to\s+(?:present|offer|introduce)[^.!?]*[.!?]\s*/i,'');x=x.replace(/(?:For more information|For further information|To arrange a viewing|Contact us)[\s\S]*$/i,'').trim();return x}
+function buildDescription(d){const typ=inferType(pfUrl).toLowerCase();const intro=`Vero are proud to present this ${d.beds?d.beds+'-bedroom ':''}${typ}${d.building?' in '+d.building:''}.`;
+  const feats=titleFeatures(d);const raw=cleanedListingDescription(d.description||'');
+  let html=`<p>${esc(intro)}</p>`;if(feats.length)html+=`<div class="feature-lines">Unit Features:<br>${feats.map(x=>'• '+esc(x)).join('<br>')}</div>`;if(raw)html+=`<p>${esc(raw)}</p>`;html+=`<p>At Vero, we leverage our deep market understanding to deliver comprehensive real estate solutions and exceptional client outcomes.</p>`;return html}
+function gallery(el,photos,start,count){el.innerHTML='';for(let i=0;i<count;i++){const src=photos[start+i];if(src){const im=document.createElement('img');im.src=src;im.alt='Property photo';im.crossOrigin='anonymous';el.appendChild(im)}else{const ph=document.createElement('div');ph.className='empty';el.appendChild(ph)}}}
+function waitImages(){const imgs=[...document.images].filter(i=>i.src);return Promise.all(imgs.map(i=>i.complete?Promise.resolve():new Promise(r=>{i.onload=i.onerror=r}))) }
+async function load(){showStatus('Loading Vero brochure…');if(!pfUrl){document.getElementById('error').textContent='No Property Finder URL supplied.';document.getElementById('error').style.display='block';document.body.classList.remove('loading');return}
+ try{const r=await fetch('/api/scrape?url='+encodeURIComponent(pfUrl));const d=await r.json();if(!r.ok||d.error)throw new Error(d.error||'Unable to load listing');
+   const title=d.marketingTitle||d.building||'Private Property';const building=d.building||d.area||'Dubai';const typ=inferType(pfUrl);fill('d-title',title);fill('d-building',building);fill('d-price',d.price||'Price on request');fill('d-beds',d.beds||'—');fill('d-baths',d.baths||'—');fill('d-size',d.size?Number(String(d.size).replace(/,/g,'')).toLocaleString():'—');fill('d-type',typ);fill('d-price-label',isRent(pfUrl)?'Asking Rent':'Asking Price');fill('d-prepared',`Prepared ${humanDate()} · Hamed Taheri`);fill('d-footer-name',`${building} · Vero`);document.getElementById('descriptionBlock').innerHTML=buildDescription(d);
+   const photos=(d.photos||[]).filter(Boolean);if(photos[0])document.getElementById('coverPhoto').src=photos[0];gallery(document.getElementById('gallery1'),photos,1,6);gallery(document.getElementById('gallery2'),photos,7,6);gallery(document.getElementById('gallery3'),photos,13,6);document.title=`${building} - ${d.price||'Vero'} - Private Brochure`;await waitImages();document.body.classList.remove('loading');hideStatus();window.__VERO_BROCHURE_READY=true;
+ }catch(e){document.body.classList.remove('loading');hideStatus();const er=document.getElementById('error');er.textContent='Could not load brochure: '+e.message;er.style.display='block';window.__VERO_BROCHURE_READY=true}}
+async function copyShareLink(){try{await navigator.clipboard.writeText(location.href);showStatus('Brochure link copied');setTimeout(hideStatus,1500)}catch(_){}}
+load();
+</script>
+</body>
+</html>
