@@ -63,9 +63,9 @@ module.exports = async (req, res) => {
   // The canonical preview URL (for og:url)
   const previewUrl = `${brochureBase}/preview?url=${encodeURIComponent(pfUrl)}`;
 
-  let title = 'Property Brochure | Hamed Taheri Properties';
-  let description = 'Presented by Hamed Taheri Dlaviz · Licensed Real Estate Broker · Dubai';
-  let image = `${brochureBase}/og-default.png`;
+  let title = 'Vero Private Property Brochure | Hamed Taheri';
+  let description = 'Presented by Hamed Taheri · Senior Private Client Advisor · Vero Real Estate · Dubai';
+  let image = `${brochureBase}/assets/vero-og.jpg`;
   let price = '';
   let beds = '';
   let area = '';
@@ -77,7 +77,7 @@ module.exports = async (req, res) => {
     const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     if (titleTag) {
       const raw = titleTag[1].replace(/\s*[\|\-–].*$/, '').trim();
-      if (raw) title = raw + ' | Hamed Taheri Properties';
+      if (raw) title = raw + ' | Vero Real Estate';
     }
 
     // og:image from PropertyFinder (first real photo)
@@ -101,7 +101,7 @@ module.exports = async (req, res) => {
             const p = Number(String(props.price).replace(/[^0-9]/g, ''));
             if (p > 0 && p < 1e9) price = 'AED ' + p.toLocaleString();
           }
-          if (props.title) title = props.title + ' | Hamed Taheri Properties';
+          if (props.title) title = props.title + ' | Vero Real Estate';
           if (props.photos && props.photos.length > 0) {
             const ph = props.photos[0];
             const src = ph.url || ph.src || ph;
@@ -117,7 +117,7 @@ module.exports = async (req, res) => {
     if (area) parts.push(area + ' sqft');
     if (price) parts.push(price);
     if (parts.length > 0) {
-      description = parts.join(' · ') + ' · Presented by Hamed Taheri Dlaviz, BetterHomes Dubai';
+      description = parts.join(' · ') + ' · Presented by Hamed Taheri · Vero Real Estate';
     }
 
   } catch (e) {
@@ -152,7 +152,7 @@ module.exports = async (req, res) => {
   <meta property="og:image"       content="${safeImage}">
   <meta property="og:image:width"  content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:site_name"   content="Hamed Taheri Properties">
+  <meta property="og:site_name"   content="Vero Real Estate">
 
   <!-- Twitter Card -->
   <meta name="twitter:card"        content="summary_large_image">

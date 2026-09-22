@@ -19,7 +19,7 @@ module.exports = async (req,res)=>{
     const pageUrl=`${proto}://${host}/brochure?url=${encodeURIComponent(pfUrl)}&print=1`;
     await page.goto(pageUrl,{waitUntil:'networkidle0',timeout:30000});
     await page.waitForFunction(()=>window.__VERO_BROCHURE_READY===true,{timeout:20000}).catch(()=>{});
-    const pdf=await page.pdf({format:'A4',landscape:true,printBackground:true,margin:{top:0,right:0,bottom:0,left:0},preferCSSPageSize:true});
+    const pdf=await page.pdf({format:'A4',landscape:false,printBackground:true,margin:{top:0,right:0,bottom:0,left:0},preferCSSPageSize:true});
     res.setHeader('Content-Type','application/pdf');res.setHeader('Content-Disposition',`attachment; filename*=UTF-8''${encodeURIComponent(fname)}`);res.setHeader('Cache-Control','private, no-store');res.statusCode=200;res.end(pdf);
   }catch(e){res.statusCode=500;res.setHeader('Content-Type','application/json');res.end(JSON.stringify({error:e.message}))}
   finally{if(browser)await browser.close().catch(()=>{})}

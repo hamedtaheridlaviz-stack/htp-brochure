@@ -42,8 +42,8 @@ module.exports = async (req, res) => {
   const pageUrl  = `${proto}://${host}/api/brochure?url=${encodeURIComponent(pfUrl || '')}`;
 
   let title       = 'Vero Private Property Brochure – Dubai';
-  let description = 'Private property brochure prepared by Hamed Taheri · Vero Real Estate · +971 58 517 1746';
-  let image       = `${proto}://${host}/assets/vero-logo.png`;
+  let description = 'Private property brochure prepared by Hamed Taheri · Senior Private Client Advisor · Vero Real Estate · +971 58 517 1746';
+  let image       = `${proto}://${host}/assets/vero-og.jpg`;
 
   // If params passed directly — use them (fast, no scraping needed)
   if (titleParam || bedsParam || priceParam) {
@@ -57,7 +57,7 @@ module.exports = async (req, res) => {
     description = [
       bedsParam  ? `${bedsParam} Bedroom` : null,
       priceParam ? `AED ${priceParam}`    : null,
-      'Hamed Taheri · Vero · +971 58 517 1746'
+      'Hamed Taheri · Senior Private Client Advisor · Vero · +971 58 517 1746'
     ].filter(Boolean).join(' · ');
   }
 
@@ -80,14 +80,14 @@ module.exports = async (req, res) => {
           title = [
             d.building,
             d.beds  ? `${d.beds} BR`   : null,
-            d.price ? `AED ${d.price}` : null,
+            d.price ? d.price : null,
             'Vero Real Estate'
           ].filter(Boolean).join(' | ');
 
           description = [
             d.marketingTitle || d.area || '',
             d.size ? `${d.size} sqft`   : null,
-            'Hamed Taheri · Vero · +971 58 517 1746'
+            'Hamed Taheri · Senior Private Client Advisor · Vero · +971 58 517 1746'
           ].filter(Boolean).join(' · ');
         }
         if (d.photos && d.photos[0]) image = d.photos[0];

@@ -34,11 +34,11 @@ module.exports = (req, res) => {
   }
 
   const { title, beds, price } = parseSlug(slug);
-  const ogTitle = [title, beds ? `${beds} BR` : null, price ? `AED ${price}` : null, 'Hamed Taheri Properties']
+  const ogTitle = [title, beds ? `${beds} BR` : null, price ? `AED ${price}` : null, 'Vero Real Estate']
     .filter(Boolean).join(' | ');
-  const ogDesc = [beds ? `${beds} Bedroom` : null, price ? `AED ${price}` : null, 'Contact Hamed Taheri: +971 58 517 1746']
+  const ogDesc = [beds ? `${beds} Bedroom` : null, price ? `AED ${price}` : null, 'Hamed Taheri · Senior Private Client Advisor · +971 58 517 1746']
     .filter(Boolean).join(' · ');
-  const ogImage  = `${proto}://${host}/bh_logo_tight_highres.png`;
+  const ogImage  = `${proto}://${host}/assets/vero-og.jpg`;
   const pageUrl  = `${proto}://${host}/p/${encodeURIComponent(slug)}/${id}`;
 
   const html = `<!DOCTYPE html>
