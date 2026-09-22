@@ -41,8 +41,8 @@ module.exports = async (req, res) => {
   const redirect = pfUrl ? `/brochure?url=${encodeURIComponent(pfUrl)}` : '/brochure';
   const pageUrl  = `${proto}://${host}/api/brochure?url=${encodeURIComponent(pfUrl || '')}`;
 
-  let title       = 'Vero Private Property Brochure – Dubai';
-  let description = 'Private property brochure prepared by Hamed Taheri · Senior Private Client Advisor · Vero Real Estate · +971 58 517 1746';
+  let title       = 'Vero Property Brochure – Dubai';
+  let description = 'Vero is proud to present this property · Hamed Taheri · Senior Private Client Advisor · +971 58 517 1746';
   let image       = `${proto}://${host}/assets/vero-og.jpg`;
 
   // If params passed directly — use them (fast, no scraping needed)

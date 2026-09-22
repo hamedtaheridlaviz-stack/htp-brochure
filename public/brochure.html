@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
 <meta name="color-scheme" content="light">
-<title>Vero Private Property Brochure</title>
+<title>Vero Property Brochure</title>
 <style>
   :root{
     --navy:#061d32;
@@ -19,6 +19,7 @@
     --shadow:0 24px 70px rgba(6,29,50,.10);
     --serif:"Iowan Old Style","Baskerville","Times New Roman",Georgia,serif;
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,Helvetica,sans-serif;
+    --logo-width:145px;
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth;background:#eef1f4}
@@ -35,7 +36,7 @@
   }
   .header-inner{max-width:1180px;height:76px;margin:0 auto;padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:22px}
   .brand-link{display:inline-flex;align-items:center;text-decoration:none;min-width:0}
-  .brand-logo{width:145px;height:auto;object-fit:contain}
+  .brand-logo{width:var(--logo-width);height:auto;object-fit:contain}
   .header-actions{display:flex;align-items:center;gap:10px}
   .header-btn{border:1px solid var(--line);background:#fff;color:var(--navy);height:42px;padding:0 18px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:1.35px;text-transform:uppercase;transition:.18s ease}
   .header-btn:hover{transform:translateY(-1px);border-color:#c9d2db;box-shadow:0 8px 20px rgba(6,29,50,.08)}
@@ -64,18 +65,15 @@
   .hero-kicker{font-size:11px;letter-spacing:4px;text-transform:uppercase;font-weight:650;opacity:.9;margin-bottom:18px}
   .hero-headline{font-family:var(--serif);font-weight:400;font-size:clamp(54px,6vw,88px);line-height:.92;letter-spacing:-2.6px;margin:0;max-width:700px;text-wrap:balance}
   .hero-location{position:absolute;z-index:2;left:64px;bottom:42px;color:#fff;font-size:11px;letter-spacing:4px;text-transform:uppercase;font-weight:650}
-  .hero-mark{position:absolute;z-index:2;right:52px;bottom:38px;color:#fff;text-align:right}
-  .hero-mark .name{font-family:var(--serif);font-size:33px;letter-spacing:6px;line-height:1}
-  .hero-mark .sub{font-size:9px;letter-spacing:3px;margin-top:8px;text-transform:uppercase;opacity:.86}
+  .hero-watermark{position:absolute;z-index:2;left:50%;top:50%;transform:translate(-50%,-50%);width:var(--logo-width);height:auto;object-fit:contain;opacity:.68;pointer-events:none;filter:drop-shadow(0 2px 10px rgba(0,0,0,.08))}
 
   /* Summary */
   .content-pad{padding:54px 56px 0}
   .eyebrow{font-size:10px;letter-spacing:3.6px;text-transform:uppercase;font-weight:700;color:#72839a}
-  .summary-top{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:42px;align-items:end}
-  .summary-title{font-family:var(--serif);font-size:clamp(42px,5vw,65px);font-weight:400;line-height:.98;letter-spacing:-2px;color:var(--navy);margin:10px 0 10px}
+  .summary-top{display:block}
+  .summary-title{font-family:var(--serif);font-size:clamp(36px,4.6vw,58px);font-weight:400;line-height:1.02;letter-spacing:-1.7px;color:var(--navy);margin:10px 0 10px;max-width:900px;text-wrap:balance}
   .property-name{font-size:20px;line-height:1.4;color:#718096;margin:0;max-width:720px}
   .price{font-family:var(--serif);font-size:clamp(39px,4.7vw,60px);line-height:1;color:var(--navy);margin-top:18px;letter-spacing:-1.6px}
-  .summary-aside{border-top:1px solid #9aa9b8;padding-top:17px;color:#6f8194;font-size:10px;line-height:1.8;letter-spacing:3px;text-transform:uppercase;align-self:center}
   .property-meta{margin-top:13px;color:#83909e;font-size:12px;letter-spacing:.4px}
 
   /* Stats */
@@ -88,12 +86,11 @@
 
   /* About */
   .about{padding-top:34px}
-  .section-grid{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:48px;align-items:start}
+  .section-grid{display:block}
   .section-title{font-family:var(--serif);font-size:43px;line-height:1.02;letter-spacing:-1.3px;color:var(--navy);margin:0 0 14px;font-weight:400}
   .about-copy{font-size:16px;line-height:1.75;color:#5c6d7f;max-width:840px}
   .about-copy p{margin:0 0 16px}
   .about-copy .feature-lines{margin:18px 0 20px;color:#34485b}
-  .side-phrase{border-top:1px solid #9aa9b8;padding-top:15px;color:#6f8194;font-size:10px;line-height:1.8;letter-spacing:3px;text-transform:uppercase;margin-top:5px}
 
   /* Gallery */
   .gallery-section{padding-top:30px}
@@ -117,8 +114,6 @@
   .brand-phrase{height:100%;border-left:1px solid #d4dbe2;padding-left:30px;display:flex;align-items:center;color:#697a8d;font-size:10px;line-height:1.9;letter-spacing:3px;text-transform:uppercase}
   .cta{margin-top:13px;display:flex;width:100%;min-height:58px;border:0;border-radius:17px;background:linear-gradient(90deg,#051a2e,#0a2b49);color:#fff;text-decoration:none;align-items:center;justify-content:center;gap:26px;font-size:11px;font-weight:750;letter-spacing:4px;text-transform:uppercase;box-shadow:0 10px 25px rgba(6,29,50,.14)}
   .cta .arrow{font-size:25px;font-weight:300;line-height:1}
-  .footer-line{display:flex;justify-content:center;gap:18px;padding:0 0 28px;color:#8a96a4;font-size:9px;letter-spacing:3.1px;text-transform:uppercase}
-  .footer-line span+span::before{content:"|";margin-right:18px;color:#b5bec6}
 
   /* Lightbox */
   .lightbox{position:fixed;inset:0;z-index:140;background:rgba(1,12,22,.93);display:none;align-items:center;justify-content:center;padding:24px;padding-top:calc(24px + env(safe-area-inset-top));padding-bottom:calc(24px + env(safe-area-inset-bottom))}
@@ -133,7 +128,7 @@
   @media(max-width:760px){
     html,body{background:#fff}
     .header-inner{height:70px;padding:0 18px}
-    .brand-logo{width:118px}
+    :root{--logo-width:118px}
     .header-actions{display:none}
     .menu-btn{display:block}
     #status{top:calc(82px + env(safe-area-inset-top))}
@@ -145,16 +140,12 @@
     .hero-kicker{font-size:9px;letter-spacing:3px;margin-bottom:12px}
     .hero-headline{font-size:48px;line-height:.95;letter-spacing:-1.8px;max-width:92%}
     .hero-location{left:24px;right:118px;bottom:22px;font-size:9px;letter-spacing:2.8px;line-height:1.5}
-    .hero-mark{right:20px;bottom:21px}
-    .hero-mark .name{font-size:23px;letter-spacing:4px}
-    .hero-mark .sub{font-size:7px;letter-spacing:2px;margin-top:6px}
     .content-pad{padding:27px 18px 0}
     .summary-top{display:block}
     .eyebrow{font-size:9px;letter-spacing:3.1px}
-    .summary-title{font-size:39px;line-height:1.02;letter-spacing:-1.2px;margin:8px 0 7px}
+    .summary-title{font-size:34px;line-height:1.03;letter-spacing:-1px;margin:8px 0 7px}
     .property-name{font-size:16px;line-height:1.4}
     .price{font-size:37px;letter-spacing:-.9px;margin-top:13px}
-    .summary-aside{display:none}
     .property-meta{font-size:11px;margin-top:9px}
     .stats{gap:9px;margin-top:22px}
     .stat{min-height:99px;border-radius:14px;padding:14px 11px;display:block;text-align:center}
@@ -165,7 +156,6 @@
     .section-grid{display:block}
     .section-title{font-size:35px;letter-spacing:-1px;margin-bottom:11px}
     .about-copy{font-size:14.5px;line-height:1.68}
-    .side-phrase{display:none}
     .gallery-section{padding-top:20px}
     .gallery-head{margin-bottom:10px}
     .gallery-head .section-title{font-size:29px;margin:0}
@@ -181,8 +171,6 @@
     .contact-lines svg{width:16px;height:16px}
     .brand-phrase{display:none}
     .cta{min-height:56px;border-radius:15px;margin-top:10px;font-size:10.5px;letter-spacing:3.3px}
-    .footer-line{font-size:8px;gap:10px;letter-spacing:2.1px;padding-bottom:17px}
-    .footer-line span+span::before{margin-right:10px}
     .lightbox{padding:10px}
     .lightbox-prev{left:10px}.lightbox-next{right:10px}.lightbox-close{right:10px}
   }
@@ -205,15 +193,15 @@
     #brochure{padding:0!important}
     .brochure-shell{max-width:none!important;width:210mm!important;margin:0!important;border-radius:0!important;box-shadow:none!important;opacity:1!important;filter:none!important;overflow:visible!important}
     .hero{height:126mm!important;min-height:126mm!important;max-height:126mm!important;break-inside:avoid;page-break-inside:avoid}
-    .hero-copy{left:13mm;top:13mm;max-width:128mm}.hero-headline{font-size:36pt!important;letter-spacing:-1.1pt}.hero-kicker{font-size:7pt}.hero-location{left:13mm;bottom:9mm;font-size:7pt}.hero-mark{right:10mm;bottom:8mm}
+    .hero-copy{left:13mm;top:13mm;max-width:128mm}.hero-headline{font-size:36pt!important;letter-spacing:-1.1pt}.hero-kicker{font-size:7pt}.hero-location{left:13mm;bottom:9mm;font-size:7pt}.hero-watermark{width:32mm}
     .content-pad{padding:10mm 12mm 0!important}
-    .summary-top{grid-template-columns:1fr 48mm;gap:10mm}.summary-title{font-size:27pt!important}.property-name{font-size:10pt}.price{font-size:26pt!important}.summary-aside{font-size:6.5pt}.property-meta{font-size:7pt}
+    .summary-top{display:block}.summary-title{font-size:24pt!important}.property-name{font-size:10pt}.price{font-size:26pt!important}.property-meta{font-size:7pt}
     .stats{gap:3mm;margin-top:6mm}.stat{min-height:25mm;border-radius:3mm;padding:4mm}.stat-icon{width:10mm;height:10mm}.stat-value{font-size:17pt}.stat-label{font-size:7pt}
-    .about{padding-top:7mm;break-before:auto}.section-grid{grid-template-columns:1fr 40mm;gap:8mm}.section-title{font-size:23pt}.about-copy{font-size:8.4pt;line-height:1.55}.side-phrase{font-size:6.3pt}
+    .about{padding-top:7mm;break-before:auto}.section-grid{display:block}.section-title{font-size:23pt}.about-copy{font-size:8.4pt;line-height:1.55}
     .gallery-section{padding-top:7mm;break-before:page;page-break-before:always}.gallery-head{margin-bottom:4mm}.gallery-head .section-title{font-size:24pt}.gallery-head p{font-size:7pt}
     .gallery-strip{display:grid!important;grid-auto-flow:row!important;grid-template-columns:repeat(2,1fr)!important;grid-auto-columns:auto!important;gap:4mm!important;overflow:visible!important;scroll-snap-type:none!important}
     .gallery-item{aspect-ratio:1.48/1;border-radius:2mm;break-inside:avoid;page-break-inside:avoid}
-    .contact-wrap{padding:7mm 0 8mm;break-inside:avoid;page-break-inside:avoid}.contact-card{grid-template-columns:26mm 1fr 42mm;gap:5mm;border-radius:4mm;padding:5mm}.agent-photo{width:26mm;height:26mm}.agent-name{font-size:17pt}.agent-role{font-size:7pt}.contact-lines{font-size:7.7pt}.brand-phrase{font-size:6pt;padding-left:6mm}.cta{min-height:12mm;border-radius:3mm;font-size:7pt;margin-top:3mm}.footer-line{font-size:5.8pt;padding-bottom:4mm}
+    .contact-wrap{padding:7mm 0 8mm;break-inside:avoid;page-break-inside:avoid}.contact-card{grid-template-columns:26mm 1fr 42mm;gap:5mm;border-radius:4mm;padding:5mm}.agent-photo{width:26mm;height:26mm}.agent-name{font-size:17pt}.agent-role{font-size:7pt}.contact-lines{font-size:7.7pt}.brand-phrase{font-size:6pt;padding-left:6mm}.cta{min-height:12mm;border-radius:3mm;font-size:7pt;margin-top:3mm}
     *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   }
 </style>
@@ -247,20 +235,19 @@
         <h1 class="hero-headline" id="heroHeadline">Private<br>Residence</h1>
       </div>
       <div class="hero-location" id="heroLocation">Dubai</div>
-      <div class="hero-mark"><div class="name">VERO</div><div class="sub">Real Estate</div></div>
+      <img class="hero-watermark" src="/assets/vero-watermark.png" alt="" aria-hidden="true">
     </section>
 
     <div class="content-pad">
       <section class="summary">
         <div class="summary-top">
           <div>
-            <div class="eyebrow">Private Property</div>
-            <h2 class="summary-title">Private Property Brochure</h2>
+            <div class="eyebrow">Exclusive Listing</div>
+            <h2 class="summary-title" id="propertyAddress">Property · Dubai</h2>
             <p class="property-name" id="propertyName">Property</p>
             <div class="price" id="propertyPrice">AED —</div>
-            <div class="property-meta" id="propertyMeta">Prepared by Hamed Taheri · Vero Real Estate</div>
+            <div class="property-meta" id="propertyMeta">Apartment · For Sale</div>
           </div>
-          <div class="summary-aside">Distinctive homes<br>considered service<br>private guidance</div>
         </div>
 
         <div class="stats" aria-label="Property statistics">
@@ -285,7 +272,6 @@
             <h2 class="section-title">About This Home</h2>
             <div class="about-copy" id="descriptionBlock"><p>Property details will appear here.</p></div>
           </div>
-          <div class="side-phrase">More than a home<br>a considered lifestyle</div>
         </div>
       </section>
 
@@ -313,7 +299,6 @@
         </div>
         <a class="cta" id="whatsappCta" href="#"><span>Get In Touch</span><span class="arrow">→</span></a>
       </section>
-      <footer class="footer-line"><span>Dubai</span><span>London</span><span>Global</span></footer>
     </div>
   </article>
 </main>
@@ -338,14 +323,15 @@ const isRent=url=>/\/rent\//i.test(url||'');
 function inferType(url){const s=(url||'').toLowerCase();if(s.includes('penthouse'))return 'Penthouse';if(s.includes('townhouse'))return 'Townhouse';if(s.includes('villa'))return 'Villa';if(s.includes('duplex'))return 'Duplex';if(s.includes('studio'))return 'Studio';return 'Apartment'}
 function showStatus(t){const e=document.getElementById('status');e.textContent=t;e.style.display='block'}
 function hideStatus(){document.getElementById('status').style.display='none'}
-function humanDate(){return new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'short',year:'numeric'}).format(new Date())}
 function formatSize(v){const n=Number(String(v||'').replace(/[^0-9.]/g,''));return Number.isFinite(n)&&n>0?Math.round(n).toLocaleString('en-US'):'—'}
 function stripAED(v){return String(v||'').replace(/^AED\s*/i,'').trim()}
-function cleanedListingDescription(s){let x=cleanText(s);x=x.replace(/^[^.!?]{0,220}\b(?:is|are)\s+proud\s+to\s+(?:present|offer|introduce)[^.!?]*[.!?]\s*/i,'');x=x.replace(/(?:For more information|For further information|To arrange a viewing|Contact us)[\s\S]*$/i,'').trim();return x}
+function cleanedListingDescription(s){let x=cleanText(s);x=x.replace(/^[^.!?]{0,300}\b(?:is|are)\s+(?:proud|delighted|pleased|excited|honou?red|thrilled)\s+to\s+(?:present|offer|introduce|bring\s+to\s+market)[^.!?]*[.!?]\s*/i,'');x=x.replace(/^[^.!?]{0,260}\b(?:real\s+estate|properties|realty)\s+(?:presents|offers|introduces)[^.!?]*[.!?]\s*/i,'');x=x.replace(/(?:For more information|For further information|To arrange a viewing|Contact us)[\s\S]*$/i,'').trim();return x}
 function featureItems(d){const items=[];const mt=(d.marketingTitle||'').split('|').map(x=>x.trim()).filter(Boolean);mt.forEach(x=>{if(x.length>2&&x.length<46&&!/bed|bath|sq\s*ft/i.test(x))items.push(x)});if(d.tenure)items.push(d.tenure);return [...new Set(items)].slice(0,5)}
-function buildDescription(d){const raw=cleanedListingDescription(d.description||'');const feats=featureItems(d);let h='';if(raw)h+=`<p>${esc(raw)}</p>`;if(feats.length)h+=`<div class="feature-lines">${feats.map(x=>'• '+esc(x)).join('<br>')}</div>`;if(!h)h='<p>A carefully selected Dubai residence presented by Vero Real Estate.</p>';return h}
+function buildDescription(d){const raw=cleanedListingDescription(d.description||'');const feats=featureItems(d);const address=propertyAddress(d);let h=`<p>Vero is proud to present this residence at ${esc(address)}.</p>`;if(raw)h+=`<p>${esc(raw)}</p>`;if(feats.length)h+=`<div class="feature-lines">${feats.map(x=>'• '+esc(x)).join('<br>')}</div>`;return h}
 function buildHeroHeadline(d){const m=(d.marketingTitle||'').split('|').map(x=>x.trim()).filter(Boolean).filter(x=>x.length<42);if(m.length){return m.slice(0,2).map(esc).join('<br>')}return 'Private<br>Residence'}
 function displayPropertyName(d){const b=String(d.building||'').trim();if(b&&b.length<115)return b;return d.area||'Dubai'}
+function propertyAddress(d){const b=String(d.building||'').trim();const a=String(d.area||'Dubai').trim();if(b&&a&&b.toLowerCase()!==a.toLowerCase())return `${b} | ${a}`;return b||a||'Dubai'}
+function displayMarketingLine(d){const m=String(d.marketingTitle||'').trim();const b=String(d.building||'').trim();return m&&m.toLowerCase()!==b.toLowerCase()?m:''}
 function waitImages(){const imgs=[...document.images].filter(i=>i.src);return Promise.all(imgs.map(i=>i.complete?Promise.resolve():new Promise(r=>{i.onload=i.onerror=r})))}
 function buildWhatsAppUrl(label){const text=`Hi Hamed, I would like to arrange a private viewing for ${label}. ${location.href}`;return `https://wa.me/971585171746?text=${encodeURIComponent(text)}`}
 
@@ -367,7 +353,7 @@ function toggleMenu(){const m=document.getElementById('mobileMenu');const b=docu
 function closeMenu(){document.getElementById('mobileMenu').classList.remove('open');document.getElementById('menuButton').setAttribute('aria-expanded','false')}
 async function shareBrochure(){
   try{
-    if(navigator.share){await navigator.share({title:document.title,text:'Vero Private Property Brochure',url:location.href});return}
+    if(navigator.share){await navigator.share({title:document.title,text:'Vero is proud to present this property.',url:location.href});return}
     await navigator.clipboard.writeText(location.href);showStatus('Brochure link copied');setTimeout(hideStatus,1400)
   }catch(e){if(e&&e.name!=='AbortError'){try{await navigator.clipboard.writeText(location.href);showStatus('Brochure link copied');setTimeout(hideStatus,1400)}catch(_){}}}
 }
@@ -378,13 +364,14 @@ async function load(){
   if(!pfUrl){const e=document.getElementById('error');e.textContent='No Property Finder URL supplied.';e.style.display='block';document.body.classList.remove('loading');hideStatus();window.__VERO_BROCHURE_READY=true;return}
   try{
     const r=await fetch('/api/scrape?url='+encodeURIComponent(pfUrl),{cache:'no-store'});const d=await r.json();if(!r.ok||d.error)throw new Error(d.error||'Unable to load listing');
-    const type=inferType(pfUrl);const propertyName=displayPropertyName(d);const price=d.price||'Price on request';const locationText=d.area||'Dubai';
+    const type=inferType(pfUrl);const propertyName=displayPropertyName(d);const address=propertyAddress(d);const marketingLine=displayMarketingLine(d);const price=d.price||'Price on request';const locationText=d.area||'Dubai';
     document.getElementById('heroKicker').textContent=(propertyName||type).toUpperCase();
     document.getElementById('heroHeadline').innerHTML=buildHeroHeadline(d);
     document.getElementById('heroLocation').textContent=locationText;
-    document.getElementById('propertyName').textContent=propertyName;
+    document.getElementById('propertyAddress').textContent=address;
+    const pn=document.getElementById('propertyName');pn.textContent=marketingLine;pn.style.display=marketingLine?'block':'none';
     document.getElementById('propertyPrice').textContent=price;
-    document.getElementById('propertyMeta').textContent=`${type} · ${isRent(pfUrl)?'For Rent':'For Sale'} · Prepared ${humanDate()}`;
+    document.getElementById('propertyMeta').textContent=`${type} · ${isRent(pfUrl)?'For Rent':'For Sale'}`;
     document.getElementById('bedsValue').textContent=d.beds||'—';
     document.getElementById('bathsValue').textContent=d.baths||'—';
     document.getElementById('sizeValue').textContent=formatSize(d.size);
@@ -393,7 +380,7 @@ async function load(){
     if(photos[0])document.getElementById('heroPhoto').src=photos[0];else document.getElementById('heroPhoto').style.display='none';
     renderGallery(photos.slice(1).concat(photos.length===1?photos:[]));
     const wa=buildWhatsAppUrl(propertyName||type);document.getElementById('whatsappCta').href=wa;document.getElementById('menuWhatsapp').href=wa;
-    document.title=`${propertyName} · ${stripAED(price)} · Vero Private Brochure`;
+    document.title=`${address} · ${stripAED(price)} · Vero`;
     await waitImages();document.body.classList.remove('loading');hideStatus();window.__VERO_BROCHURE_READY=true;
   }catch(err){document.body.classList.remove('loading');hideStatus();const e=document.getElementById('error');e.textContent='Could not load brochure: '+err.message;e.style.display='block';window.__VERO_BROCHURE_READY=true}
 }

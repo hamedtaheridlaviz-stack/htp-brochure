@@ -63,7 +63,7 @@ module.exports = async (req, res) => {
   // The canonical preview URL (for og:url)
   const previewUrl = `${brochureBase}/preview?url=${encodeURIComponent(pfUrl)}`;
 
-  let title = 'Vero Private Property Brochure | Hamed Taheri';
+  let title = 'Vero Property Brochure | Hamed Taheri';
   let description = 'Presented by Hamed Taheri · Senior Private Client Advisor · Vero Real Estate · Dubai';
   let image = `${brochureBase}/assets/vero-og.jpg`;
   let price = '';
