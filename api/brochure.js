@@ -29,7 +29,7 @@ module.exports = async (req, res) => {
 
   // Real human → redirect to static brochure page
   if (!isBot) {
-    const dest = pfUrl ? `/brochure?url=${encodeURIComponent(pfUrl)}` : '/brochure';
+    const dest = pfUrl ? `/?url=${encodeURIComponent(pfUrl)}` : '/';
     res.writeHead(302, { Location: dest });
     res.end();
     return;
@@ -38,27 +38,16 @@ module.exports = async (req, res) => {
   // ── Bot: build OG tags ───────────────────────────────────────────────────
   const host    = req.headers.host;
   const proto   = req.headers['x-forwarded-proto'] || 'https';
-  const redirect = pfUrl ? `/brochure?url=${encodeURIComponent(pfUrl)}` : '/brochure';
-  const pageUrl  = `${proto}://${host}/api/brochure?url=${encodeURIComponent(pfUrl || '')}`;
+  const redirect = pfUrl ? `/?url=${encodeURIComponent(pfUrl)}` : '/';
+  const pageUrl  = `${proto}://${host}/brochure?url=${encodeURIComponent(pfUrl || '')}`;
 
-  let title       = 'Vero Property Brochure – Dubai';
-  let description = 'Vero is proud to present this property · Hamed Taheri · Senior Private Client Advisor · +971 58 517 1746';
+  let title       = 'Property Brochure';
+  let description = 'View brochure';
   let image       = `${proto}://${host}/assets/vero-og.jpg`;
 
   // If params passed directly — use them (fast, no scraping needed)
-  if (titleParam || bedsParam || priceParam) {
-    title = [
-      titleParam,
-      bedsParam  ? `${bedsParam} BR`    : null,
-      priceParam ? `AED ${priceParam}`  : null,
-      'Vero Real Estate'
-    ].filter(Boolean).join(' | ');
-
-    description = [
-      bedsParam  ? `${bedsParam} Bedroom` : null,
-      priceParam ? `AED ${priceParam}`    : null,
-      'Hamed Taheri · Senior Private Client Advisor · Vero · +971 58 517 1746'
-    ].filter(Boolean).join(' · ');
+  if (titleParam) {
+    title = titleParam;
   }
 
   if (photoParam) {
@@ -77,25 +66,22 @@ module.exports = async (req, res) => {
 
       if (!d.error) {
         if (!titleParam) {
+          const building = String(d.building || '').trim();
+          const area = String(d.area || '').trim();
           title = [
-            d.building,
-            d.beds  ? `${d.beds} BR`   : null,
-            d.price ? d.price : null,
-            'Vero Real Estate'
-          ].filter(Boolean).join(' | ');
-
-          description = [
-            d.marketingTitle || d.area || '',
-            d.size ? `${d.size} sqft`   : null,
-            'Hamed Taheri · Senior Private Client Advisor · Vero · +971 58 517 1746'
-          ].filter(Boolean).join(' · ');
+            building || null,
+            area && area.toLowerCase() !== building.toLowerCase() ? area : null
+          ].filter(Boolean).join(' | ') || 'Property Brochure';
         }
+        description = 'View brochure';
         if (d.photos && d.photos[0]) image = d.photos[0];
       }
     } catch (_) {
       // Timed out or failed — use logo fallback
     }
   }
+
+  description = 'View brochure';
 
   const html = `<!DOCTYPE html>
 <html>

@@ -63,8 +63,8 @@ module.exports = async (req, res) => {
   // The canonical preview URL (for og:url)
   const previewUrl = `${brochureBase}/preview?url=${encodeURIComponent(pfUrl)}`;
 
-  let title = 'Vero Property Brochure | Hamed Taheri';
-  let description = 'Presented by Hamed Taheri · Senior Private Client Advisor · Vero Real Estate · Dubai';
+  let title = 'Property Brochure';
+  let description = 'View brochure';
   let image = `${brochureBase}/assets/vero-og.jpg`;
   let price = '';
   let beds = '';
@@ -77,7 +77,7 @@ module.exports = async (req, res) => {
     const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     if (titleTag) {
       const raw = titleTag[1].replace(/\s*[\|\-–].*$/, '').trim();
-      if (raw) title = raw + ' | Vero Real Estate';
+      if (raw) title = raw;
     }
 
     // og:image from PropertyFinder (first real photo)
@@ -86,7 +86,8 @@ module.exports = async (req, res) => {
 
     // og:description or description
     const ogDesc = metaContent(html, 'og:description') || metaContent(html, 'description');
-    if (ogDesc) description = ogDesc;
+    // Keep WhatsApp preview intentionally minimal.
+    if (ogDesc) { /* brochure page uses listing data; preview text stays fixed */ }
 
     // Try __NEXT_DATA__ for structured data
     const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
@@ -101,7 +102,7 @@ module.exports = async (req, res) => {
             const p = Number(String(props.price).replace(/[^0-9]/g, ''));
             if (p > 0 && p < 1e9) price = 'AED ' + p.toLocaleString();
           }
-          if (props.title) title = props.title + ' | Vero Real Estate';
+          if (props.title) title = props.title;
           if (props.photos && props.photos.length > 0) {
             const ph = props.photos[0];
             const src = ph.url || ph.src || ph;
@@ -111,14 +112,8 @@ module.exports = async (req, res) => {
       } catch (e) {}
     }
 
-    // Build a smart description
-    const parts = [];
-    if (beds) parts.push(beds + ' Bed');
-    if (area) parts.push(area + ' sqft');
-    if (price) parts.push(price);
-    if (parts.length > 0) {
-      description = parts.join(' · ') + ' · Presented by Hamed Taheri · Vero Real Estate';
-    }
+    // Keep the link preview clean: photo, property title, then "View brochure".
+    description = 'View brochure';
 
   } catch (e) {
     // Fall through with defaults — still render the redirect page
@@ -152,7 +147,6 @@ module.exports = async (req, res) => {
   <meta property="og:image"       content="${safeImage}">
   <meta property="og:image:width"  content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:site_name"   content="Vero Real Estate">
 
   <!-- Twitter Card -->
   <meta name="twitter:card"        content="summary_large_image">

@@ -53,7 +53,7 @@
     },
     {
       "src": "/brochure",
-      "dest": "/public/brochure.html"
+      "dest": "/api/brochure.js"
     },
     {
       "src": "/",

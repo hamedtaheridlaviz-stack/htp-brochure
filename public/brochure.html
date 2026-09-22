@@ -365,7 +365,8 @@ function displayPropertyName(d){const b=String(d.building||'').trim();if(b&&b.le
 function propertyAddress(d){const b=String(d.building||'').trim();const a=String(d.area||'Dubai').trim();if(b&&a&&b.toLowerCase()!==a.toLowerCase())return `${b} | ${a}`;return b||a||'Dubai'}
 function displayMarketingLine(d){const m=String(d.marketingTitle||'').trim();const b=String(d.building||'').trim();return m&&m.toLowerCase()!==b.toLowerCase()?m:''}
 function waitImages(){const imgs=[...document.images].filter(i=>i.src);return Promise.all(imgs.map(i=>i.complete?Promise.resolve():new Promise(r=>{i.onload=i.onerror=r})))}
-function buildWhatsAppUrl(label){const text=`Hi Hamed, I would like to arrange a private viewing for ${label}. ${location.href}`;return `https://wa.me/971585171746?text=${encodeURIComponent(text)}`}
+function richBrochureUrl(){return pfUrl?`${location.origin}/brochure?url=${encodeURIComponent(pfUrl)}`:location.href}
+function buildWhatsAppUrl(label){const text=`Hi Hamed, I would like to arrange a private viewing for ${label}. ${richBrochureUrl()}`;return `https://wa.me/971585171746?text=${encodeURIComponent(text)}`}
 
 function renderGallery(photos){
   galleryPhotos=photos.filter(Boolean).slice(0,20);
@@ -385,9 +386,10 @@ function toggleMenu(){const m=document.getElementById('mobileMenu');const b=docu
 function closeMenu(){document.getElementById('mobileMenu').classList.remove('open');document.getElementById('menuButton').setAttribute('aria-expanded','false')}
 async function shareBrochure(){
   try{
-    if(navigator.share){await navigator.share({title:document.title,text:'Vero is proud to present this property.',url:location.href});return}
-    await navigator.clipboard.writeText(location.href);showStatus('Brochure link copied');setTimeout(hideStatus,1400)
-  }catch(e){if(e&&e.name!=='AbortError'){try{await navigator.clipboard.writeText(location.href);showStatus('Brochure link copied');setTimeout(hideStatus,1400)}catch(_){}}}
+    const shareUrl=richBrochureUrl();
+    if(navigator.share){await navigator.share({title:document.title,url:shareUrl});return}
+    await navigator.clipboard.writeText(shareUrl);showStatus('Brochure link copied');setTimeout(hideStatus,1400)
+  }catch(e){if(e&&e.name!=='AbortError'){try{await navigator.clipboard.writeText(richBrochureUrl());showStatus('Brochure link copied');setTimeout(hideStatus,1400)}catch(_){}}}
 }
 function downloadPdf(){if(!pfUrl)return;showStatus('Preparing PDF…');const a=document.createElement('a');a.href='/api/pdf?url='+encodeURIComponent(pfUrl);a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();setTimeout(hideStatus,1800)}
 
