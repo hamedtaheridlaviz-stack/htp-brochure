@@ -1,0 +1,71 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "public/brochure.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "public/assets/**",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "api/scrape.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/preview.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/brochure.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/og-image.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/pdf.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/scrape",
+      "dest": "/api/scrape.js"
+    },
+    {
+      "src": "/api/preview",
+      "dest": "/api/preview.js"
+    },
+    {
+      "src": "/api/brochure",
+      "dest": "/api/brochure.js"
+    },
+    {
+      "src": "/api/og-image",
+      "dest": "/api/og-image.js"
+    },
+    {
+      "src": "/api/pdf",
+      "dest": "/api/pdf.js"
+    },
+    {
+      "src": "/preview",
+      "dest": "/api/brochure.js"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/public/assets/$1"
+    },
+    {
+      "src": "/brochure",
+      "dest": "/api/brochure.js"
+    },
+    {
+      "src": "/",
+      "dest": "/public/brochure.html"
+    }
+  ]
+}
