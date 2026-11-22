@@ -155,7 +155,7 @@ function parseListing(html, url) {
   }
   if (!beds)  { const m = text.match(/(\d+)\s*Bed(?:room)?s?\b/i);  if (m) beds  = m[1]; }
   if (!baths) { const m = text.match(/(\d+)\s*Bath(?:room)?s?\b/i); if (m) baths = m[1]; }
-  if (!size)  { const m = text.match(/([\d,]+)\s*sq\.?\s*(?:ft|feet)/i); if (m) size = m[1].replace(/,/g,''); }
+  if (!size)  { const m = text.match(/(\d[\d,]*(?:\.\d+)?)\s*sq\.?\s*(?:ft|feet)/i); if (m) size = String(Math.round(Number(m[1].replace(/,/g,'')))); }
 
   // ── Price ──
   // Strategy: __NEXT_DATA__ has real price as integer; 200,000,000 is a fake/default
