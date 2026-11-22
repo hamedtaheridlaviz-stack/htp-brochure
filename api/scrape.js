@@ -38,6 +38,14 @@ function isBlocked(html) {
 
 // Fallback: load the page in headless Chrome, which runs the bot-check script
 // and then receives the real listing page.
+function withTimeout(promise, ms, label) {
+  let t;
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => { t = setTimeout(() => rej(new Error(label + ' timed out')), ms); })
+  ]).finally(() => clearTimeout(t));
+}
+
 async function fetchWithBrowser(url) {
   const chromium = require('@sparticuz/chromium');
   const puppeteer = require('puppeteer-core');
@@ -52,12 +60,12 @@ async function fetchWithBrowser(url) {
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36');
     await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {});
     // The challenge page reloads itself into the listing; wait for the listing data.
-    await page.waitForSelector('#__NEXT_DATA__', { timeout: 20000 }).catch(() => {});
-    return await page.content();
+    await page.waitForSelector('#__NEXT_DATA__', { timeout: 15000 }).catch(() => {});
+    return await withTimeout(page.content(), 5000, 'Reading page');
   } finally {
-    if (browser) await browser.close().catch(() => {});
+    if (browser) browser.close().catch(() => {});
   }
 }
 
@@ -293,16 +301,22 @@ module.exports = async (req, res) => {
   if (!url) return res.status(400).json({ error: 'No URL provided' });
 
   try {
+    const debug = req.query && req.query.debug === '1';
+    const trace = [];
     let html = '';
-    try { html = await fetchUrl(url); } catch (_) { html = ''; }
+    try { html = await withTimeout(fetchUrl(url), 12000, 'Direct fetch'); trace.push('direct:' + html.length + ':' + (isBlocked(html) ? 'blocked' : 'ok')); }
+    catch (e) { html = ''; trace.push('direct:error:' + e.message); }
 
     if (isBlocked(html)) {
-      try { html = await fetchWithBrowser(url); } catch (_) { /* fall through to blocked check */ }
+      try { html = await withTimeout(fetchWithBrowser(url), 45000, 'Headless browser'); trace.push('browser:' + html.length + ':' + (isBlocked(html) ? 'blocked' : 'ok')); }
+      catch (e) { trace.push('browser:error:' + e.message); }
     }
 
     if (isBlocked(html)) {
       res.setHeader('Cache-Control', 'no-store');
-      return res.status(502).json({ error: 'Property Finder did not return the listing. Please try again in a minute.', blocked: true });
+      const body = { error: 'Property Finder did not return the listing. Please try again in a minute.', blocked: true };
+      if (debug) { body.trace = trace; body.sample = (html || '').replace(/\s+/g, ' ').slice(0, 400); }
+      return res.status(502).json(body);
     }
 
     const data = parseListing(html, url);
