@@ -27,6 +27,265 @@ function fetchUrl(url, redirectCount) {
   });
 }
 
+// Property Finder sometimes answers server requests with a bot-check page
+// ("JavaScript is disabled") instead of the listing. Detect that page.
+function isBlocked(html) {
+  if (!html) return true;
+  if (/<script id="__NEXT_DATA__"/.test(html)) return false;
+  if (/application\/ld\+json/.test(html) && /static\.shared\.propertyfinder\.ae/.test(html)) return false;
+  return /javascript is disabled|awswaf|challenge-container|captcha|access denied/i.test(html) || html.length < 20000;
+}
+
+// Fallback: load the page in headless Chrome, which runs the bot-check script
+// and then receives the real listing page.
+async function fetchWithBrowser(url) {
+  const chromium = require('@sparticuz/chromium');
+  const puppeteer = require('puppeteer-core');
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+    });
+    const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36');
+    await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
+    // The challenge page reloads itself into the listing; wait for the listing data.
+    await page.waitForSelector('#__NEXT_DATA__', { timeout: 20000 }).catch(() => {});
+    return await page.content();
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+  }
+}
+
+function parseListing(html, url) {
+    // ── JSON-LD ──
+  let jsonLD = null;
+  const jsonLDMatches = Array.from(html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi));
+  for (const match of jsonLDMatches) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      if (parsed.name || parsed['@type']) { jsonLD = parsed; break; }
+    } catch(e) {}
+  }
+
+  // ── __NEXT_DATA__ (Next.js serialised store) ──
+  let nextStr = '';
+  const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (nextMatch) {
+    try {
+      JSON.parse(nextMatch[1]); // validate
+      nextStr = nextMatch[1];
+    } catch(e) {}
+  }
+
+  const metaContent = (name) => {
+    const pats = [
+      new RegExp('<meta[^>]*name="' + name + '"[^>]*content="([^"]*)"', 'i'),
+      new RegExp('<meta[^>]*content="([^"]*)"[^>]*name="' + name + '"', 'i'),
+      new RegExp('<meta[^>]*property="' + name + '"[^>]*content="([^"]*)"', 'i'),
+      new RegExp('<meta[^>]*content="([^"]*)"[^>]*property="' + name + '"', 'i'),
+    ];
+    for (const p of pats) { const m = html.match(p); if (m) return m[1]; }
+    return '';
+  };
+
+  const cleanHtml = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
+  const text = cleanHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+  // ── Building name ──
+  let building = (jsonLD && jsonLD.name) || metaContent('og:title') || '';
+  building = building.replace(/\s*[\|\-]\s*(?:Property\s*Finder|PropertyFinder|Bayut|betterhomes)[\s\S]*/i, '').trim();
+  building = building.replace(/^(?:Sale|Rent|Buy)\s+in\s+/i, '').trim();
+  building = building.split('|')[0].split(':')[0].trim();
+
+  // ── Marketing title (listing headline e.g. "New To Market | C Type | Fully Renovated") ──
+  let marketingTitle = '';
+  // h1 elements — skip ones that match building name or contain "Property Finder"
+  const h1s = Array.from(html.matchAll(/<h1[^>]*>([^<]{10,150})<\/h1>/gi));
+  for (const m of h1s) {
+    const t = m[1].trim();
+    if (t.toLowerCase().includes('property finder')) continue;
+    if (t === building) continue;
+    marketingTitle = t;
+    break;
+  }
+  // Fallback: __NEXT_DATA__ title field
+  if (!marketingTitle && nextStr) {
+    const m = nextStr.match(/"title"\s*:\s*"([^"]{10,150})"/);
+    if (m && !m[1].includes('Property Finder')) marketingTitle = m[1];
+  }
+
+  // ── Area ──
+  let area = '';
+  if (jsonLD && jsonLD.address) area = jsonLD.address.addressLocality || jsonLD.address.addressRegion || '';
+  if (!area) {
+    const ogTitle = metaContent('og:title') || '';
+    const m = ogTitle.match(/in\s+([\w\s]+(?:,\s*[\w\s]+)?)\s*[\|:]/i);
+    if (m) area = m[1].trim();
+  }
+  if (!area) area = 'Dubai';
+
+  // ── REF ──
+  let ref = '';
+  const urlRefM = url.match(/-(\d{6,})\.html/);
+  if (urlRefM) ref = urlRefM[1];
+  if (!ref) {
+    const refM = text.match(/(?:Reference|Ref(?:erence)?\s*(?:No\.?|Number|#|:))\s*([A-Z0-9\-]{4,20})/i);
+    if (refM) ref = refM[1];
+  }
+
+  // ── Beds / Baths / Size ──
+  let beds = '', baths = '', size = '';
+  if (jsonLD) {
+    beds  = String(jsonLD.numberOfRooms || jsonLD.numberOfBedrooms || '');
+    baths = String(jsonLD.numberOfBathroomsTotal || jsonLD.numberOfBathrooms || '');
+    if (jsonLD.floorSize) size = String(jsonLD.floorSize.value || '');
+  }
+  if (!beds)  { const m = text.match(/(\d+)\s*Bed(?:room)?s?\b/i);  if (m) beds  = m[1]; }
+  if (!baths) { const m = text.match(/(\d+)\s*Bath(?:room)?s?\b/i); if (m) baths = m[1]; }
+  if (!size)  { const m = text.match(/([\d,]+)\s*sq\.?\s*(?:ft|feet)/i); if (m) size = m[1].replace(/,/g,''); }
+
+  // ── Price ──
+  // Strategy: __NEXT_DATA__ has real price as integer; 200,000,000 is a fake/default
+  let price = '';
+
+  // Method 1: __NEXT_DATA__ — find price integer in valid range
+  if (nextStr) {
+    const pricePatterns = [
+      /"price"\s*:\s*\{\s*"value"\s*:\s*(\d+)/,
+      /"asking_price"\s*:\s*(\d+)/,
+      /"listingPrice"\s*:\s*(\d+)/,
+      /"price"\s*:\s*(\d{5,9})[,\}]/,
+    ];
+    for (const pat of pricePatterns) {
+      const m = nextStr.match(pat);
+      if (m) {
+        const raw = Number(m[1]);
+        if (raw >= 100000 && raw <= 100000000) { price = 'AED ' + raw.toLocaleString(); break; }
+      }
+    }
+  }
+
+  // Method 2: og:description — usually contains "AED 5,790,000"
+  if (!price) {
+    const ogDesc = metaContent('og:description') || '';
+    const m = ogDesc.match(/AED\s*([\d,]+)/i);
+    if (m) {
+      const raw = Number(m[1].replace(/,/g,''));
+      if (raw >= 100000 && raw <= 100000000) price = 'AED ' + raw.toLocaleString();
+    }
+  }
+
+  // Method 3: any inline script containing price integer (not 200000000)
+  if (!price) {
+    const scriptBlocks = Array.from(html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi));
+    for (const sb of scriptBlocks) {
+      const s = sb[1];
+      if (!s.includes('price') && !s.includes('Price')) continue;
+      const m = s.match(/"price"\s*:\s*(\d{6,9})/);
+      if (m) {
+        const raw = Number(m[1]);
+        if (raw >= 100000 && raw <= 100000000) { price = 'AED ' + raw.toLocaleString(); break; }
+      }
+    }
+  }
+
+  // Method 4: text scan capped at 100M
+  if (!price) {
+    const candidates = [];
+    const allM = Array.from(text.matchAll(/AED\s*([\d,]+)/gi));
+    for (const m of allM) {
+      const raw = Number(m[1].replace(/,/g,''));
+      if (raw >= 100000 && raw <= 100000000) candidates.push(raw);
+    }
+    if (candidates.length > 0) {
+      const freq = {};
+      candidates.forEach(v => freq[v] = (freq[v]||0)+1);
+      const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1] || Number(a[0])-Number(b[0]));
+      price = 'AED ' + Number(sorted[0][0]).toLocaleString();
+    }
+  }
+
+  let tenure = '';
+  if (text.toLowerCase().includes('freehold')) tenure = 'Freehold';
+  else if (text.toLowerCase().includes('leasehold')) tenure = 'Leasehold';
+
+  // ── Description — use the listing's own property detail text where available ──
+  let description = '';
+  if (jsonLD && typeof jsonLD.description === 'string') description = jsonLD.description;
+  if (!description && nextStr) {
+    const dm = nextStr.match(/"description"\s*:\s*"((?:\\.|[^"\\]){40,6000})"/);
+    if (dm) {
+      try { description = JSON.parse('"' + dm[1] + '"'); } catch (_) { description = dm[1].replace(/\\n/g, '\n').replace(/\\"/g, '"'); }
+    }
+  }
+  if (!description) {
+    const ogDesc = metaContent('og:description') || '';
+    if (ogDesc.length > 80) description = ogDesc;
+  }
+  if (!description) description = 'A well-presented residence in a sought-after Dubai location, offering comfortable living spaces and convenient access to local amenities.';
+
+  // ── Features ──
+  const features = [];
+  if (beds)   features.push(beds + ' Bedroom' + (parseInt(beds) > 1 ? 's' : ''));
+  if (baths)  features.push(baths + ' Bathroom' + (parseInt(baths) > 1 ? 's' : ''));
+  if (size)   features.push(size + ' sq ft');
+  if (tenure) features.push(tenure);
+
+  // ── Photos — extract unique images by UUID segment ──
+  // PF URL structure: /listing/PROPERTY_HASH/IMAGE_UUID/668x452.jpg
+  // Each unique image has a different IMAGE_UUID — dedupe on that
+  const photos = [];
+  const seenUUIDs = new Set();
+
+  const addPhoto = (src) => {
+    if (!src || !src.startsWith('http')) return;
+    if (src.includes('floorplan') || src.includes('floor-plan')) return;
+    if (photos.length >= 20) return;
+    // Extract the UUID segment (second hash in path)
+    const uuidMatch = src.match(/listing\/[A-Za-z0-9]+\/([A-Za-z0-9\-]+)\//);
+    const key = uuidMatch ? uuidMatch[1] : src;
+    if (seenUUIDs.has(key)) return;
+    seenUUIDs.add(key);
+    photos.push(src);
+  };
+
+  // Primary: all PF CDN listing images from raw HTML
+  // Pattern: https://static.shared.propertyfinder.ae/media/images/listing/HASH/UUID/668x452.jpg
+  const pfPattern = new RegExp("https://static\\.shared\\.propertyfinder\\.ae/media/images/listing/[A-Za-z0-9]+/[A-Za-z0-9-]+/[^\\s\"']+\\.jpg", "g");
+  Array.from(html.matchAll(pfPattern)).forEach(m => addPhoto(m[0]));
+
+  // JSON-LD images as supplement
+  if (jsonLD && jsonLD.image) {
+    const imgs = Array.isArray(jsonLD.image) ? jsonLD.image : [jsonLD.image];
+    imgs.forEach(img => {
+      const src = typeof img === 'string' ? img : (img.url || img.contentUrl || '');
+      addPhoto(src);
+    });
+  }
+
+  // og:image fallback only if nothing found
+  if (photos.length === 0) {
+    const og = metaContent('og:image');
+    if (og && !og.includes('floorplan')) photos.push(og);
+  }
+
+  // ── Floor plan ──
+  let floorplan = '';
+  const fpM = html.match(/https:\/\/static\.shared\.propertyfinder\.ae\/media\/images\/f[^"'\s\\]+(?:\.jpg|\.png|\.webp)/i);
+  if (fpM) floorplan = fpM[0];
+  if (!floorplan) {
+    const fpM2 = html.match(/https:\/\/[^"'\s]+floorplan[^"'\s]+(?:\.jpg|\.png|\.webp)/i);
+    if (fpM2) floorplan = fpM2[0];
+  }
+
+  return { building, area, ref, beds, baths, size, price, tenure, description, features, photos, floorplan, marketingTitle };
+}
+
 module.exports = async (req, res) => {
   const url = req.query && req.query.url;
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -34,232 +293,30 @@ module.exports = async (req, res) => {
   if (!url) return res.status(400).json({ error: 'No URL provided' });
 
   try {
-    const html = await fetchUrl(url);
+    let html = '';
+    try { html = await fetchUrl(url); } catch (_) { html = ''; }
 
-    // ── JSON-LD ──
-    let jsonLD = null;
-    const jsonLDMatches = Array.from(html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi));
-    for (const match of jsonLDMatches) {
-      try {
-        const parsed = JSON.parse(match[1]);
-        if (parsed.name || parsed['@type']) { jsonLD = parsed; break; }
-      } catch(e) {}
+    if (isBlocked(html)) {
+      try { html = await fetchWithBrowser(url); } catch (_) { /* fall through to blocked check */ }
     }
 
-    // ── __NEXT_DATA__ (Next.js serialised store) ──
-    let nextStr = '';
-    const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-    if (nextMatch) {
-      try {
-        JSON.parse(nextMatch[1]); // validate
-        nextStr = nextMatch[1];
-      } catch(e) {}
+    if (isBlocked(html)) {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(502).json({ error: 'Property Finder did not return the listing. Please try again in a minute.', blocked: true });
     }
 
-    const metaContent = (name) => {
-      const pats = [
-        new RegExp('<meta[^>]*name="' + name + '"[^>]*content="([^"]*)"', 'i'),
-        new RegExp('<meta[^>]*content="([^"]*)"[^>]*name="' + name + '"', 'i'),
-        new RegExp('<meta[^>]*property="' + name + '"[^>]*content="([^"]*)"', 'i'),
-        new RegExp('<meta[^>]*content="([^"]*)"[^>]*property="' + name + '"', 'i'),
-      ];
-      for (const p of pats) { const m = html.match(p); if (m) return m[1]; }
-      return '';
-    };
-
-    const cleanHtml = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
-    const text = cleanHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-
-    // ── Building name ──
-    let building = (jsonLD && jsonLD.name) || metaContent('og:title') || '';
-    building = building.replace(/\s*[\|\-]\s*(?:Property\s*Finder|PropertyFinder|Bayut|betterhomes)[\s\S]*/i, '').trim();
-    building = building.replace(/^(?:Sale|Rent|Buy)\s+in\s+/i, '').trim();
-    building = building.split('|')[0].split(':')[0].trim();
-
-    // ── Marketing title (listing headline e.g. "New To Market | C Type | Fully Renovated") ──
-    let marketingTitle = '';
-    // h1 elements — skip ones that match building name or contain "Property Finder"
-    const h1s = Array.from(html.matchAll(/<h1[^>]*>([^<]{10,150})<\/h1>/gi));
-    for (const m of h1s) {
-      const t = m[1].trim();
-      if (t.toLowerCase().includes('property finder')) continue;
-      if (t === building) continue;
-      marketingTitle = t;
-      break;
-    }
-    // Fallback: __NEXT_DATA__ title field
-    if (!marketingTitle && nextStr) {
-      const m = nextStr.match(/"title"\s*:\s*"([^"]{10,150})"/);
-      if (m && !m[1].includes('Property Finder')) marketingTitle = m[1];
+    const data = parseListing(html, url);
+    if (/javascript is disabled/i.test(data.marketingTitle || '') || (!data.price && !data.photos.length)) {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(502).json({ error: 'Property Finder did not return the listing. Please try again in a minute.', blocked: true });
     }
 
-    // ── Area ──
-    let area = '';
-    if (jsonLD && jsonLD.address) area = jsonLD.address.addressLocality || jsonLD.address.addressRegion || '';
-    if (!area) {
-      const ogTitle = metaContent('og:title') || '';
-      const m = ogTitle.match(/in\s+([\w\s]+(?:,\s*[\w\s]+)?)\s*[\|:]/i);
-      if (m) area = m[1].trim();
-    }
-    if (!area) area = 'Dubai';
-
-    // ── REF ──
-    let ref = '';
-    const urlRefM = url.match(/-(\d{6,})\.html/);
-    if (urlRefM) ref = urlRefM[1];
-    if (!ref) {
-      const refM = text.match(/(?:Reference|Ref(?:erence)?\s*(?:No\.?|Number|#|:))\s*([A-Z0-9\-]{4,20})/i);
-      if (refM) ref = refM[1];
-    }
-
-    // ── Beds / Baths / Size ──
-    let beds = '', baths = '', size = '';
-    if (jsonLD) {
-      beds  = String(jsonLD.numberOfRooms || jsonLD.numberOfBedrooms || '');
-      baths = String(jsonLD.numberOfBathroomsTotal || jsonLD.numberOfBathrooms || '');
-      if (jsonLD.floorSize) size = String(jsonLD.floorSize.value || '');
-    }
-    if (!beds)  { const m = text.match(/(\d+)\s*Bed(?:room)?s?\b/i);  if (m) beds  = m[1]; }
-    if (!baths) { const m = text.match(/(\d+)\s*Bath(?:room)?s?\b/i); if (m) baths = m[1]; }
-    if (!size)  { const m = text.match(/([\d,]+)\s*sq\.?\s*(?:ft|feet)/i); if (m) size = m[1].replace(/,/g,''); }
-
-    // ── Price ──
-    // Strategy: __NEXT_DATA__ has real price as integer; 200,000,000 is a fake/default
-    let price = '';
-
-    // Method 1: __NEXT_DATA__ — find price integer in valid range
-    if (nextStr) {
-      const pricePatterns = [
-        /"price"\s*:\s*\{\s*"value"\s*:\s*(\d+)/,
-        /"asking_price"\s*:\s*(\d+)/,
-        /"listingPrice"\s*:\s*(\d+)/,
-        /"price"\s*:\s*(\d{5,9})[,\}]/,
-      ];
-      for (const pat of pricePatterns) {
-        const m = nextStr.match(pat);
-        if (m) {
-          const raw = Number(m[1]);
-          if (raw >= 100000 && raw <= 100000000) { price = 'AED ' + raw.toLocaleString(); break; }
-        }
-      }
-    }
-
-    // Method 2: og:description — usually contains "AED 5,790,000"
-    if (!price) {
-      const ogDesc = metaContent('og:description') || '';
-      const m = ogDesc.match(/AED\s*([\d,]+)/i);
-      if (m) {
-        const raw = Number(m[1].replace(/,/g,''));
-        if (raw >= 100000 && raw <= 100000000) price = 'AED ' + raw.toLocaleString();
-      }
-    }
-
-    // Method 3: any inline script containing price integer (not 200000000)
-    if (!price) {
-      const scriptBlocks = Array.from(html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi));
-      for (const sb of scriptBlocks) {
-        const s = sb[1];
-        if (!s.includes('price') && !s.includes('Price')) continue;
-        const m = s.match(/"price"\s*:\s*(\d{6,9})/);
-        if (m) {
-          const raw = Number(m[1]);
-          if (raw >= 100000 && raw <= 100000000) { price = 'AED ' + raw.toLocaleString(); break; }
-        }
-      }
-    }
-
-    // Method 4: text scan capped at 100M
-    if (!price) {
-      const candidates = [];
-      const allM = Array.from(text.matchAll(/AED\s*([\d,]+)/gi));
-      for (const m of allM) {
-        const raw = Number(m[1].replace(/,/g,''));
-        if (raw >= 100000 && raw <= 100000000) candidates.push(raw);
-      }
-      if (candidates.length > 0) {
-        const freq = {};
-        candidates.forEach(v => freq[v] = (freq[v]||0)+1);
-        const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1] || Number(a[0])-Number(b[0]));
-        price = 'AED ' + Number(sorted[0][0]).toLocaleString();
-      }
-    }
-
-    let tenure = '';
-    if (text.toLowerCase().includes('freehold')) tenure = 'Freehold';
-    else if (text.toLowerCase().includes('leasehold')) tenure = 'Leasehold';
-
-    // ── Description — use the listing's own property detail text where available ──
-    let description = '';
-    if (jsonLD && typeof jsonLD.description === 'string') description = jsonLD.description;
-    if (!description && nextStr) {
-      const dm = nextStr.match(/"description"\s*:\s*"((?:\\.|[^"\\]){40,6000})"/);
-      if (dm) {
-        try { description = JSON.parse('"' + dm[1] + '"'); } catch (_) { description = dm[1].replace(/\\n/g, '\n').replace(/\\"/g, '"'); }
-      }
-    }
-    if (!description) {
-      const ogDesc = metaContent('og:description') || '';
-      if (ogDesc.length > 80) description = ogDesc;
-    }
-    if (!description) description = 'A well-presented residence in a sought-after Dubai location, offering comfortable living spaces and convenient access to local amenities.';
-
-    // ── Features ──
-    const features = [];
-    if (beds)   features.push(beds + ' Bedroom' + (parseInt(beds) > 1 ? 's' : ''));
-    if (baths)  features.push(baths + ' Bathroom' + (parseInt(baths) > 1 ? 's' : ''));
-    if (size)   features.push(size + ' sq ft');
-    if (tenure) features.push(tenure);
-
-    // ── Photos — extract unique images by UUID segment ──
-    // PF URL structure: /listing/PROPERTY_HASH/IMAGE_UUID/668x452.jpg
-    // Each unique image has a different IMAGE_UUID — dedupe on that
-    const photos = [];
-    const seenUUIDs = new Set();
-
-    const addPhoto = (src) => {
-      if (!src || !src.startsWith('http')) return;
-      if (src.includes('floorplan') || src.includes('floor-plan')) return;
-      if (photos.length >= 20) return;
-      // Extract the UUID segment (second hash in path)
-      const uuidMatch = src.match(/listing\/[A-Za-z0-9]+\/([A-Za-z0-9\-]+)\//);
-      const key = uuidMatch ? uuidMatch[1] : src;
-      if (seenUUIDs.has(key)) return;
-      seenUUIDs.add(key);
-      photos.push(src);
-    };
-
-    // Primary: all PF CDN listing images from raw HTML
-    // Pattern: https://static.shared.propertyfinder.ae/media/images/listing/HASH/UUID/668x452.jpg
-    const pfPattern = new RegExp("https://static\\.shared\\.propertyfinder\\.ae/media/images/listing/[A-Za-z0-9]+/[A-Za-z0-9-]+/[^\\s\"']+\\.jpg", "g");
-    Array.from(html.matchAll(pfPattern)).forEach(m => addPhoto(m[0]));
-
-    // JSON-LD images as supplement
-    if (jsonLD && jsonLD.image) {
-      const imgs = Array.isArray(jsonLD.image) ? jsonLD.image : [jsonLD.image];
-      imgs.forEach(img => {
-        const src = typeof img === 'string' ? img : (img.url || img.contentUrl || '');
-        addPhoto(src);
-      });
-    }
-
-    // og:image fallback only if nothing found
-    if (photos.length === 0) {
-      const og = metaContent('og:image');
-      if (og && !og.includes('floorplan')) photos.push(og);
-    }
-
-    // ── Floor plan ──
-    let floorplan = '';
-    const fpM = html.match(/https:\/\/static\.shared\.propertyfinder\.ae\/media\/images\/f[^"'\s\\]+(?:\.jpg|\.png|\.webp)/i);
-    if (fpM) floorplan = fpM[0];
-    if (!floorplan) {
-      const fpM2 = html.match(/https:\/\/[^"'\s]+floorplan[^"'\s]+(?:\.jpg|\.png|\.webp)/i);
-      if (fpM2) floorplan = fpM2[0];
-    }
-
-    return res.status(200).json({ building, area, ref, beds, baths, size, price, tenure, description, features, photos, floorplan, marketingTitle });
+    // Cache good results at Vercel's edge so shared brochures keep working.
+    res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
+    return res.status(200).json(data);
 
   } catch (err) {
+    res.setHeader('Cache-Control', 'no-store');
     return res.status(500).json({ error: err.message });
   }
 };
