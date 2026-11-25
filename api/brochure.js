@@ -17,6 +17,29 @@ function esc(str) {
     .replace(/>/g, '&gt;');
 }
 
+// Building / area straight from the Property Finder link (instant; the full read can take 10+ s and WhatsApp
+// gives up long before that). e.g. ...-sale-dubai-palm-jumeirah-marina-residences-marina-residences-3-139204106.html
+const AREAS = ['palm-jumeirah','dubai-marina','jumeirah-beach-residence','downtown-dubai','business-bay','dubai-hills-estate',
+  'jumeirah-islands','emirates-hills','the-wilds','tilal-al-ghaf','jumeirah-lake-towers','bluewaters-island','dubai-harbour',
+  'arabian-ranches','jumeirah-golf-estates','district-one','mohammed-bin-rashid-city','meydan-city','al-barari','city-walk',
+  'jumeirah-village-circle','dubai-creek-harbour','the-palm-jumeirah','port-de-la-mer','la-mer','jumeirah'];
+function cap(s) { return s.split('-').filter(Boolean).map(w => /^\d/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(' '); }
+function fromSlug(u) {
+  const m = String(u || '').match(/\/plp\/[^/]+\/[a-z-]+?-for-(?:sale|rent)-dubai-(.+?)-[A-Za-z0-9]{6,}\.html/);
+  if (!m) return null;
+  let rest = m[1], area = '';
+  for (const a of AREAS) { if (rest === a || rest.startsWith(a + '-')) { area = a; rest = rest.slice(a.length + 1); break; } }
+  const w = rest.split('-').filter(Boolean);
+  const j = w.indexOf(w[0], 1);              // "marina residences marina residences 3" -> "marina residences 3"
+  const bld = cap((j > 0 ? w.slice(j) : w).join('-'));
+  return { building: bld, area: cap(area), rent: /\/rent\//.test(u) };
+}
+function short(v) {
+  const n = parseFloat(String(v || '').replace(/[^0-9.]/g, ''));
+  if (!n) return '';
+  return n >= 1e6 ? 'AED ' + (n / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M' : 'AED ' + Math.round(n / 1e3) + 'K';
+}
+
 module.exports = async (req, res) => {
   const pfUrl    = req.query.url;
   const photoParam = req.query.photo;
@@ -42,9 +65,17 @@ module.exports = async (req, res) => {
   const redirect = pfUrl ? `/?url=${encodeURIComponent(pfUrl)}${req.query.for ? '&for=' + encodeURIComponent(req.query.for) : ''}` : '/';
   const pageUrl  = `${proto}://${host}/brochure?url=${encodeURIComponent(pfUrl || '')}`;
 
-  let title       = 'Property Brochure';
-  let description = 'View brochure';
-  let image       = `${proto}://${host}/assets/vero-og.jpg`;
+  // Compact black preview (25 Nov 2026): small square Vero tile -> WhatsApp shows a slim card with a thumbnail,
+  // title = building | area, line 2 = price · beds · size (· Prepared for <name>).
+  const slug = fromSlug(pfUrl);
+  let title       = slug ? [slug.building, slug.area && slug.area !== slug.building ? slug.area : ''].filter(Boolean).join(' | ') : 'Vero · Private brochure';
+  let description = 'Private brochure · Vero';
+  let image       = `${proto}://${host}/assets/vero-og-square.jpg`;
+  let imgW = 600, imgH = 600;
+  const sizeParam = req.query.size;
+  const facts = (p, b, z, rent) => [short(p) ? short(p) + (rent ? ' /yr' : '') : '', b ? (/^(0|studio)$/i.test(String(b)) ? 'Studio' : b + ' bed') : '',
+    z ? Math.round(parseFloat(String(z).replace(/[^0-9.]/g, ''))).toLocaleString('en-US') + ' sqft' : ''].filter(Boolean).join(' · ');
+  if (priceParam || bedsParam || sizeParam) description = facts(priceParam, bedsParam, sizeParam, slug && slug.rent) || description;
 
   // If params passed directly — use them (fast, no scraping needed)
   if (titleParam) {
@@ -52,12 +83,12 @@ module.exports = async (req, res) => {
   }
 
   if (photoParam) {
-    image = photoParam;
-  } else if (pfUrl) {
+    image = photoParam; imgW = 1200; imgH = 630;
+  } else if (pfUrl && !(priceParam && titleParam)) {
     // Try scraping — but with a short timeout so WhatsApp doesn't give up
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4000); // 4s timeout
+      const timeout = setTimeout(() => controller.abort(), 4500); // WhatsApp waits ~5 s
       const r = await fetch(
         `${proto}://${host}/api/scrape?url=${encodeURIComponent(pfUrl)}`,
         { signal: controller.signal }
@@ -74,15 +105,15 @@ module.exports = async (req, res) => {
             area && area.toLowerCase() !== building.toLowerCase() ? area : null
           ].filter(Boolean).join(' | ') || 'Property Brochure';
         }
-        description = 'View brochure';
-        if (d.photos && d.photos[0]) image = d.photos[0];
+        const f = facts(d.price, d.beds, d.size, slug && slug.rent);
+        if (f && !priceParam) description = f;
       }
     } catch (_) {
       // Timed out or failed — use logo fallback
     }
   }
 
-  description = 'View brochure';
+  if (req.query.for) description += ' · Prepared for ' + String(req.query.for).slice(0, 40);
 
   const html = `<!DOCTYPE html>
 <html>
@@ -93,10 +124,10 @@ module.exports = async (req, res) => {
 <meta property="og:title"        content="${esc(title)}">
 <meta property="og:description"  content="${esc(description)}">
 <meta property="og:image"        content="${esc(image)}">
-<meta property="og:image:width"  content="1200">
-<meta property="og:image:height" content="630">
+<meta property="og:image:width"  content="${imgW}">
+<meta property="og:image:height" content="${imgH}">
 <meta property="og:url"          content="${esc(pageUrl)}">
-<meta name="twitter:card"        content="summary_large_image">
+<meta name="twitter:card"        content="${imgW === imgH ? 'summary' : 'summary_large_image'}">
 <meta name="twitter:title"       content="${esc(title)}">
 <meta name="twitter:description" content="${esc(description)}">
 <meta name="twitter:image"       content="${esc(image)}">
