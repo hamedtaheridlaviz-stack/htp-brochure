@@ -28,6 +28,10 @@
   ],
   "routes": [
     {
+      "src": "/(b|r)/(\\d{6,})(?:/([^/?]*))?(?:/([^/?]*))?/?",
+      "dest": "/api/brochure.js?k=$1&id=$2&t=$3&n=$4"
+    },
+    {
       "src": "/api/scrape",
       "dest": "/api/scrape.js"
     },

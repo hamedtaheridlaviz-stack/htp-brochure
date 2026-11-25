@@ -41,6 +41,15 @@ function short(v) {
 }
 
 module.exports = async (req, res) => {
+  // Short links (25 Nov 2026): /r/<PF id>/<building-slug>[/<client-slug>] (rent) or /b/... (sale).
+  // Property Finder resolves a listing by its id whatever the slug, so the long ?url= link is no longer needed.
+  const sid = /^\d{6,}$/.test(String(req.query.id || '')) ? String(req.query.id) : '';
+  const sRent = req.query.k === 'r';
+  if (sid) {
+    req.query.url = `https://www.propertyfinder.ae/en/plp/${sRent ? 'rent' : 'buy'}/x-${sid}.html`;
+    if (req.query.n && !req.query.for) req.query.for = cap(String(req.query.n).toLowerCase().replace(/[^a-z0-9-]/g, ''));
+  }
+  const sTitle = sid && req.query.t && req.query.t !== 'home' ? cap(String(req.query.t).toLowerCase().replace(/[^a-z0-9-]/g, '')) : '';
   const pfUrl    = req.query.url;
   const photoParam = req.query.photo;
   const titleParam = req.query.title;
@@ -63,15 +72,16 @@ module.exports = async (req, res) => {
   const host    = req.headers.host;
   const proto   = req.headers['x-forwarded-proto'] || 'https';
   const redirect = pfUrl ? `/?url=${encodeURIComponent(pfUrl)}${req.query.for ? '&for=' + encodeURIComponent(req.query.for) : ''}` : '/';
-  const pageUrl  = `${proto}://${host}/brochure?url=${encodeURIComponent(pfUrl || '')}`;
+  const pageUrl  = sid ? `${proto}://${host}/${sRent ? 'r' : 'b'}/${sid}${req.query.t ? '/' + encodeURIComponent(req.query.t) : ''}${req.query.n ? '/' + encodeURIComponent(req.query.n) : ''}` : `${proto}://${host}/brochure?url=${encodeURIComponent(pfUrl || '')}`;
 
   // Compact black preview (25 Nov 2026): small square Vero tile -> WhatsApp shows a slim card with a thumbnail,
   // title = building | area, line 2 = price · beds · size (· Prepared for <name>).
-  const slug = fromSlug(pfUrl);
-  let title       = slug ? [slug.building, slug.area && slug.area !== slug.building ? slug.area : ''].filter(Boolean).join(' | ') : 'Vero · Private brochure';
+  const slug = fromSlug(pfUrl) || (sid ? { building: sTitle, area: '', rent: sRent } : null);
+  let title       = slug && slug.building ? [slug.building, slug.area && slug.area !== slug.building ? slug.area : ''].filter(Boolean).join(' | ') : 'Vero · Private brochure';
   let description = 'Private brochure · Vero';
-  let image       = `${proto}://${host}/assets/vero-og-square.jpg`;
-  let imgW = 600, imgH = 600;
+  // Slim black strip (25 Nov 2026, option D): wide and short, small Vero mark
+  let image       = `${proto}://${host}/assets/vero-og-strip.jpg`;
+  let imgW = 1200, imgH = 360;
   const sizeParam = req.query.size;
   const facts = (p, b, z, rent) => [short(p) ? short(p) + (rent ? ' /yr' : '') : '', b ? (/^(0|studio)$/i.test(String(b)) ? 'Studio' : b + ' bed') : '',
     z ? Math.round(parseFloat(String(z).replace(/[^0-9.]/g, ''))).toLocaleString('en-US') + ' sqft' : ''].filter(Boolean).join(' · ');
@@ -98,7 +108,7 @@ module.exports = async (req, res) => {
 
       if (!d.error) {
         if (!titleParam) {
-          const building = String(d.building || '').trim();
+          const building = String(sTitle || d.building || '').trim();
           const area = String(d.area || '').trim();
           title = [
             building || null,
