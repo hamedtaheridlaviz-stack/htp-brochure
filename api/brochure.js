@@ -29,7 +29,8 @@ module.exports = async (req, res) => {
 
   // Real human → redirect to static brochure page
   if (!isBot) {
-    const dest = pfUrl ? `/?url=${encodeURIComponent(pfUrl)}` : '/';
+    const forName = req.query.for ? `&for=${encodeURIComponent(req.query.for)}` : '';  // client name for "Prepared for"
+    const dest = pfUrl ? `/?url=${encodeURIComponent(pfUrl)}${forName}` : '/';
     res.writeHead(302, { Location: dest });
     res.end();
     return;
@@ -38,7 +39,7 @@ module.exports = async (req, res) => {
   // ── Bot: build OG tags ───────────────────────────────────────────────────
   const host    = req.headers.host;
   const proto   = req.headers['x-forwarded-proto'] || 'https';
-  const redirect = pfUrl ? `/?url=${encodeURIComponent(pfUrl)}` : '/';
+  const redirect = pfUrl ? `/?url=${encodeURIComponent(pfUrl)}${req.query.for ? '&for=' + encodeURIComponent(req.query.for) : ''}` : '/';
   const pageUrl  = `${proto}://${host}/brochure?url=${encodeURIComponent(pfUrl || '')}`;
 
   let title       = 'Property Brochure';
